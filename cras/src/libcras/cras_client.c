@@ -167,11 +167,11 @@ struct client_stream {
  * server_fd Incoming messages from server.
  * stream_fds - Pipe for attached streams.
  * command_fds - Pipe for user commands to thread.
+ * command_reply_fds - Pipe for acking/nacking command messages from thread.
  * sock_dir - Directory where the local audio socket can be found.
  * running - The client thread will run while this is non zero.
  * next_stream_id - ID to give the next stream.
  * tid - Thread ID of the client thread started by "cras_client_run_thread".
- * command_barrier - Used to signal the completion of a command from the user.
  * last_command_result - Passes back the result of the last user command.
  * streams - Linked list of streams attached to this client.
  * num_input_devs - Number of input devices available.
@@ -192,10 +192,10 @@ struct cras_client {
 	int server_fd;
 	int stream_fds[2];
 	int command_fds[2];
+	int command_reply_fds[2];
 	const char *sock_dir;
 	struct thread_state thread;
 	cras_stream_id_t next_stream_id;
-	pthread_barrier_t command_barrier;
 	int last_command_result;
 	struct client_stream *streams;
 	size_t num_input_devs;
@@ -1210,8 +1210,9 @@ static int handle_command_message(struct cras_client *client)
 	}
 
 cmd_msg_complete:
-	client->last_command_result = rc;
-	pthread_barrier_wait(&client->command_barrier);
+	/* Wake the waiting main thread with the result of the command. */
+	if (write(client->command_reply_fds[1], &rc, sizeof(rc)) != sizeof(rc))
+		return -EIO;
 	return rc;
 }
 
@@ -1266,6 +1267,10 @@ static void *client_thread(void *arg)
 				rc = curr_input->cb(client);
 	}
 
+	/* close the command reply pipe. */
+	close(client->command_reply_fds[1]);
+	client->command_reply_fds[1] = -1;
+
 	return NULL;
 }
 
@@ -1274,7 +1279,7 @@ static void *client_thread(void *arg)
 static int send_command_message(struct cras_client *client,
 				struct command_msg *msg)
 {
-	int rc;
+	int rc, cmd_res;
 	if (client == NULL || !client->thread.running)
 		return -EINVAL;
 
@@ -1283,8 +1288,10 @@ static int send_command_message(struct cras_client *client,
 		return -EPIPE;
 
 	/* Wait for command to complete. */
-	pthread_barrier_wait(&client->command_barrier);
-	return client->last_command_result;
+	rc = read(client->command_reply_fds[0], &cmd_res, sizeof(cmd_res));
+	if (rc != sizeof(cmd_res))
+		return -EPIPE;
+	return cmd_res;
 }
 
 /* Send a simple message to the client thread that holds no data. */
@@ -1368,24 +1375,32 @@ int cras_client_create(struct cras_client **client)
 	(*client)->server_fd = -1;
 	(*client)->id = -1;
 
-	/* Barrier used by the main thread and the audio thread, so require 2
-	 * calls to pass through. */
-	rc = pthread_barrier_init(&(*client)->command_barrier, NULL, 2);
-	if (rc != 0)
-		goto free_error;
-
+	/* Pipes used by the main thread and the client thread to send commands
+	 * and replies. */
 	rc = pipe((*client)->command_fds);
 	if (rc < 0)
 		goto free_error;
-	rc = pipe((*client)->stream_fds);
-	if (rc < 0)
+	rc = pipe((*client)->command_reply_fds);
+	if (rc < 0) {
+		close((*client)->command_fds[0]);
+		close((*client)->command_fds[1]);
 		goto free_error;
+	}
+	/* Pipe used to communicate between the client thread and the audio
+	 * thread. */
+	rc = pipe((*client)->stream_fds);
+	if (rc < 0) {
+		close((*client)->command_fds[0]);
+		close((*client)->command_fds[1]);
+		close((*client)->command_reply_fds[0]);
+		close((*client)->command_reply_fds[1]);
+		goto free_error;
+	}
 
 	openlog("cras_client", LOG_PID, LOG_USER);
 
 	return 0;
 free_error:
-	pthread_barrier_destroy(&(*client)->command_barrier);
 	free(*client);
 	*client = NULL;
 	return rc;
@@ -1399,9 +1414,12 @@ void cras_client_destroy(struct cras_client *client)
 		close(client->server_fd);
 	close(client->command_fds[0]);
 	close(client->command_fds[1]);
+	close(client->command_reply_fds[0]);
+	/* The other end of the reply pipe can be closed by the client thread */
+	if (client->command_reply_fds[1] != -1)
+		close(client->command_reply_fds[1]);
 	close(client->stream_fds[0]);
 	close(client->stream_fds[1]);
-	pthread_barrier_destroy(&(client->command_barrier));
 	free(client->output_devs);
 	free(client->input_devs);
 	free(client->attached_clients);
