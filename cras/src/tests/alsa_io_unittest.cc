@@ -693,7 +693,7 @@ TEST_F(AlsaCaptureStreamSuite, PossiblyReadWriteTwoBuffers) {
   //  Give it some samples to copy.
   rc = possibly_read_audio(aio_, &ts);
   EXPECT_EQ(0, rc);
-  EXPECT_EQ(0, shm_->num_overruns);
+  EXPECT_EQ(0, cras_shm_num_overruns(shm_));
   EXPECT_EQ(aio_->base.cb_threshold, cras_rstream_audio_ready_count);
   for (size_t i = 0; i < aio_->base.cb_threshold; i++)
     EXPECT_EQ(cras_alsa_mmap_begin_buffer[i], shm_->samples[i]);
@@ -701,7 +701,7 @@ TEST_F(AlsaCaptureStreamSuite, PossiblyReadWriteTwoBuffers) {
   cras_rstream_audio_ready_count = 999;
   rc = possibly_read_audio(aio_, &ts);
   EXPECT_EQ(0, rc);
-  EXPECT_EQ(0, shm_->num_overruns);
+  EXPECT_EQ(0, cras_shm_num_overruns(shm_));
   EXPECT_EQ(aio_->base.cb_threshold, cras_rstream_audio_ready_count);
   for (size_t i = 0; i < aio_->base.cb_threshold; i++)
     EXPECT_EQ(cras_alsa_mmap_begin_buffer[i],
@@ -718,7 +718,7 @@ TEST_F(AlsaCaptureStreamSuite, PossiblyReadWriteThreeBuffers) {
   //  Give it some samples to copy.
   rc = possibly_read_audio(aio_, &ts);
   EXPECT_EQ(0, rc);
-  EXPECT_EQ(0, shm_->num_overruns);
+  EXPECT_EQ(0, cras_shm_num_overruns(shm_));
   EXPECT_EQ(aio_->base.cb_threshold, cras_rstream_audio_ready_count);
   for (size_t i = 0; i < aio_->base.cb_threshold; i++)
     EXPECT_EQ(cras_alsa_mmap_begin_buffer[i], shm_->samples[i]);
@@ -726,7 +726,7 @@ TEST_F(AlsaCaptureStreamSuite, PossiblyReadWriteThreeBuffers) {
   cras_rstream_audio_ready_count = 999;
   rc = possibly_read_audio(aio_, &ts);
   EXPECT_EQ(0, rc);
-  EXPECT_EQ(0, shm_->num_overruns);
+  EXPECT_EQ(0, cras_shm_num_overruns(shm_));
   EXPECT_EQ(aio_->base.cb_threshold, cras_rstream_audio_ready_count);
   for (size_t i = 0; i < aio_->base.cb_threshold; i++)
     EXPECT_EQ(cras_alsa_mmap_begin_buffer[i],
@@ -735,7 +735,7 @@ TEST_F(AlsaCaptureStreamSuite, PossiblyReadWriteThreeBuffers) {
   cras_rstream_audio_ready_count = 999;
   rc = possibly_read_audio(aio_, &ts);
   EXPECT_EQ(0, rc);
-  EXPECT_EQ(1, shm_->num_overruns);  //  Should have overrun.
+  EXPECT_EQ(1, cras_shm_num_overruns(shm_));  //  Should have overrun.
   EXPECT_EQ(aio_->base.cb_threshold, cras_rstream_audio_ready_count);
   for (size_t i = 0; i < aio_->base.cb_threshold; i++)
     EXPECT_EQ(cras_alsa_mmap_begin_buffer[i], shm_->samples[i]);
