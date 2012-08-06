@@ -664,6 +664,7 @@ static snd_pcm_sframes_t read_streams(struct alsa_io *aio,
 	struct cras_io_stream *streams, *curr;
 	struct cras_audio_shm *shm;
 	snd_pcm_sframes_t delay;
+	unsigned write_limit;
 	uint8_t *dst;
 	int rc;
 
@@ -684,7 +685,8 @@ static snd_pcm_sframes_t read_streams(struct alsa_io *aio,
 					 delay,
 					 &shm->area->ts);
 
-	dst = cras_shm_get_curr_write_buffer(shm);
+	dst = cras_shm_get_writeable_frames(shm, &write_limit);
+	count = min(count, write_limit);
 	memcpy(dst, src, count * cras_shm_frame_bytes(shm));
 	cras_shm_buffer_written(shm, count);
 
