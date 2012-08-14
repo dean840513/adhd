@@ -67,6 +67,21 @@ install:	cras-config-files
 
 endif
 
+ifeq ($(BOARD), daisy)
+
+ucm_conf_files := $(wildcard $(ADHD_DIR)/ucm-config/$(BOARD)/DAISY-I2S/*)
+
+.PHONY: ucm-config-files
+ucm-config-files:
+	$(ECHO) "Installing ucm config files"
+	$(INSTALL) --mode 755 -d $(DESTDIR)usr/share/alsa/ucm/DAISY-I2S
+	$(INSTALL) --mode 644 -D $(ucm_conf_files) $(DESTDIR)usr/share/alsa/ucm/DAISY-I2S
+
+
+install:	ucm-config-files
+
+endif
+
 install:	$(DESTDIR)/etc/init/cras.conf				\
 		$(DESTDIR)/etc/asound.state				\
 		$(DESTDIR)/etc/cras/device_blacklist			\
