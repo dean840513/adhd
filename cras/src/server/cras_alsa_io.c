@@ -4,6 +4,7 @@
  */
 
 #include <alsa/asoundlib.h>
+#include <alsa/use-case.h>
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
@@ -18,6 +19,7 @@
 #include "cras_alsa_io.h"
 #include "cras_alsa_jack.h"
 #include "cras_alsa_mixer.h"
+#include "cras_alsa_ucm.h"
 #include "cras_config.h"
 #include "cras_iodev.h"
 #include "cras_iodev_list.h"
@@ -69,6 +71,7 @@ struct alsa_output_node {
  * active_output - The current node being used for playback.
  * default_output - The default node to use for playback.
  * jack_list - List of alsa jack controls for this device.
+ * ucm - ALSA use case manager, if configuration is found.
  * alsa_cb - Callback to fill or read samples (depends on direction).
  */
 struct alsa_io {
@@ -85,6 +88,7 @@ struct alsa_io {
 	struct alsa_output_node *active_output;
 	struct alsa_output_node *default_output;
 	struct cras_alsa_jack_list *jack_list;
+	snd_use_case_mgr_t *ucm;
 	int (*alsa_cb)(struct alsa_io *aio, struct timespec *ts);
 };
 
@@ -1042,6 +1046,13 @@ static void jack_input_plug_event(const struct cras_alsa_jack *jack,
 		return;
 	aio = (struct alsa_io *)arg;
 
+	/* TODO - This assumes that all input jacks mean a headset is attached.
+	 * While currently true, moving forward there needs to be a better way
+	 * to map a jack to a ucm device.
+	 */
+	if (aio->ucm)
+		ucm_set_enabled(aio->ucm, "Headset", plugged);
+
 	syslog(LOG_DEBUG, "Move input streams due to plug event.");
 	cras_iodev_move_stream_type_top_prio(CRAS_STREAM_TYPE_DEFAULT,
 					     aio->base.direction);
@@ -1073,6 +1084,7 @@ struct cras_iodev *alsa_iodev_create(size_t card_index,
 				     const char *card_name,
 				     size_t device_index,
 				     struct cras_alsa_mixer *mixer,
+				     snd_use_case_mgr_t *ucm,
 				     size_t prio,
 				     enum CRAS_STREAM_DIRECTION direction)
 {
@@ -1116,6 +1128,7 @@ struct cras_iodev *alsa_iodev_create(size_t card_index,
 	}
 
 	aio->mixer = mixer;
+	aio->ucm = ucm;
 	set_iodev_name(iodev, card_name, card_index, device_index);
 	iodev->info.priority = prio;
 
