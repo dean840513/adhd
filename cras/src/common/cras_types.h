@@ -13,6 +13,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "cras_iodev_info.h"
+
 /* Directions of audio streams. */
 enum CRAS_STREAM_DIRECTION {
 	CRAS_STREAM_OUTPUT,
@@ -37,6 +39,50 @@ struct cras_attached_client_info {
 	pid_t pid;
 	uid_t uid;
 	gid_t gid;
+};
+
+#define CRAS_MAX_IODEVS 20
+#define CRAS_MAX_ATTACHED_CLIENTS 20
+
+/* The server state that is shared with clients.
+ *    state_version - Version of this structure.
+ *    volume - index from 0-100.
+ *    min_volume_dBFS - volume in dB * 100 when volume = 1.
+ *    max_volume_dBFS - volume in dB * 100 when volume = max.
+ *    mute - 0 = unmuted, 1 = muted.
+ *    capture_gain - Capture gain in dBFS * 100.
+ *    capture_mute - 0 = unmuted, 1 = muted.
+ *    min_capture_gain - Min allowed capture gain in dBFS * 100.
+ *    max_capture_gain - Max allowed capture gain in dBFS * 100.
+ *    num_streams_attached - Total number of streams since server started.
+ *    num_output_devs - Number of available output devices.
+ *    num_input_devs - Number of available input devices.
+ *    output_devs - Output audio devices currently attached.
+ *    input_devs - Input audio devices currently attached.
+ *    num_attached_clients - Number of clients attached to server.
+ *    client_info - List of first 20 attached clients.
+ *    update_count - Incremented twice each time the struct is updated.  Odd
+ *        during updates.
+ */
+#define CRAS_SERVER_STATE_VERSION 0
+struct cras_server_state {
+	unsigned state_version;
+	size_t volume;
+	long min_volume_dBFS;
+	long max_volume_dBFS;
+	int mute;
+	long capture_gain;
+	int capture_mute;
+	long min_capture_gain;
+	long max_capture_gain;
+	unsigned num_streams_attached;
+	unsigned num_output_devs;
+	unsigned num_input_devs;
+	struct cras_iodev_info output_devs[CRAS_MAX_IODEVS];
+	struct cras_iodev_info input_devs[CRAS_MAX_IODEVS];
+	unsigned num_attached_clients;
+	struct cras_attached_client_info client_info[CRAS_MAX_ATTACHED_CLIENTS];
+	unsigned update_count;
 };
 
 /* Actions for card add/remove/change. */

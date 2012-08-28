@@ -70,6 +70,15 @@ void cras_client_destroy(struct cras_client *client);
  */
 int cras_client_connect(struct cras_client *client);
 
+/* Waits for the server to indicate that the client is connected.  Useful to
+ * ensure that any information about the server is up to date.
+ * Args:
+ *    client - pointer returned from "cras_client_create".
+ * Returns:
+ *    0 on success, or a negative error code on failure (from errno.h).
+ */
+int cras_client_connected_wait(struct cras_client *client);
+
 /* Begins running a client.
  * Args:
  *    client - the client to start (from cras_client_create).
@@ -97,7 +106,7 @@ int cras_client_stop(struct cras_client *client);
  *    in, this indicates that all of the iodev_info wouldn't fit in the provided
  *    array.
  */
-int cras_client_get_output_devices(struct cras_client *client,
+int cras_client_get_output_devices(const struct cras_client *client,
 				   struct cras_iodev_info *devs,
 				   size_t max_devs);
 
@@ -111,7 +120,7 @@ int cras_client_get_output_devices(struct cras_client *client,
  *    in, this indicates that all of the iodev_info wouldn't fit in the provided
  *    array.
  */
-int cras_client_get_input_devices(struct cras_client *client,
+int cras_client_get_input_devices(const struct cras_client *client,
 				  struct cras_iodev_info *devs,
 				  size_t max_devs);
 
@@ -125,9 +134,23 @@ int cras_client_get_input_devices(struct cras_client *client,
  *    in, this indicates that all of the clients wouldn't fit in the provided
  *    array.
  */
-int cras_client_get_attached_clients(struct cras_client *client,
+int cras_client_get_attached_clients(const struct cras_client *client,
 				     struct cras_attached_client_info *clients,
 				     size_t max_clients);
+
+/* Checks if the output device with the given name is currently plugged in.  For
+ * internal devices this checks that jack state, for USB devices this will
+ * always be true if they are present.  The name parameter can be the
+ * complete name or any unique prefix of the name.  If the name is not unique
+ * the first matching name will be checked.
+ * Args:
+ *    client - The client from cras_client_create.
+ *    name - Name of the device to check.
+ * Returns:
+ *    1 if the device exists and is plugged, 0 otherwise.
+ */
+int cras_client_output_dev_plugged(const struct cras_client *client,
+				   const char *name);
 
 /*
  * Stream handling.
