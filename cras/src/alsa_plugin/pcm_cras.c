@@ -18,7 +18,6 @@
  *  direction - input or output.
  *  areas - ALSA areas used to read from/write to.
  *  client - CRAS client object.
- *  pcm_boundary - Value where the hw and appl pointers will wrap.
  */
 struct snd_pcm_cras {
 	snd_pcm_ioplug_t io;
@@ -30,7 +29,6 @@ struct snd_pcm_cras {
 	enum CRAS_STREAM_DIRECTION direction;
 	snd_pcm_channel_area_t *areas;
 	struct cras_client *client;
-	snd_pcm_uframes_t pcm_boundary;
 };
 
 /* Frees all resources allocated during use. */
@@ -235,10 +233,6 @@ static int snd_pcm_cras_start(snd_pcm_ioplug_t *io)
 	struct cras_audio_format *audio_format;
 	int rc;
 
-	rc = get_boundary(io->pcm, &pcm_cras->pcm_boundary);
-	if (rc < 0)
-		return rc;
-
 	audio_format = cras_audio_format_create(io->format, io->rate,
 						io->channels);
 	if (audio_format == NULL)
@@ -282,8 +276,14 @@ error_out:
 
 static int snd_pcm_cras_delay(snd_pcm_ioplug_t *io, snd_pcm_sframes_t *delayp)
 {
-	struct snd_pcm_cras *pcm_cras = io->private_data;
-	const snd_pcm_sframes_t limit = pcm_cras->pcm_boundary;
+	snd_pcm_uframes_t limit;
+	int rc;
+
+	rc = get_boundary(io->pcm, &limit);
+	if ((rc < 0) || (limit == 0)) {
+		*delayp = 0;
+		return -EINVAL;
+	}
 
 	/* For playback, the latency in frames is the amount the software write
 	 * pointer is ahead of the hw read pointer.  For capture samples are
