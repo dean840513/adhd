@@ -160,7 +160,7 @@ state.PCH {
 	control.14 {
 		iface MIXER
 		name 'Surround Playback Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -190,7 +190,7 @@ state.PCH {
 	control.17 {
 		iface MIXER
 		name 'Smart Volume Playback Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -200,7 +200,7 @@ state.PCH {
 	control.18 {
 		iface MIXER
 		name 'X-Bass Playback Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -240,7 +240,7 @@ state.PCH {
 	control.22 {
 		iface MIXER
 		name 'Mic SVM Capture Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -250,7 +250,7 @@ state.PCH {
 	control.23 {
 		iface MIXER
 		name 'Noise Reduction Capture Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -260,7 +260,7 @@ state.PCH {
 	control.24 {
 		iface MIXER
 		name 'PlayEnhancement Playback Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -270,7 +270,7 @@ state.PCH {
 	control.25 {
 		iface MIXER
 		name 'CrystalVoice Capture Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
