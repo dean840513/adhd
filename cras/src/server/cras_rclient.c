@@ -53,7 +53,7 @@ static int handle_client_stream_connect(struct cras_rclient *client,
 	fmt = msg->format;
 	cras_iodev_set_format(iodev, &fmt);
 
-	if (fmt.frame_rate == 0) {
+	if (fmt.frame_rate == 0 || msg->format.frame_rate == 0) {
 		syslog(LOG_ERR, "frame_rate is zero.");
 		rc = -EINVAL;
 		goto reply_err;

@@ -33,6 +33,7 @@ static int cras_system_set_capture_mute_called;
 static size_t cras_system_set_capture_mute_locked_value;
 static int cras_system_set_capture_mute_locked_called;
 static size_t cras_make_fd_nonblocking_called;
+static unsigned int cras_iodev_set_format_frame_rate;
 
 void ResetStubData() {
   cras_rstream_create_return = 0;
@@ -53,6 +54,7 @@ void ResetStubData() {
   cras_system_set_capture_mute_locked_value = 0;
   cras_system_set_capture_mute_locked_called = 0;
   cras_make_fd_nonblocking_called = 0;
+  cras_iodev_set_format_frame_rate = 0;
 }
 
 namespace {
@@ -139,6 +141,27 @@ TEST_F(RClientMessagesSuite, FrameRateError) {
   cras_iodev_attach_stream_retval = 0;
 
   connect_msg_.format.frame_rate = 0;
+
+  rc = cras_rclient_message_from_client(rclient_, &connect_msg_.header);
+  EXPECT_EQ(0, rc);
+
+  rc = read(pipe_fds_[0], &out_msg, sizeof(out_msg));
+  EXPECT_EQ(sizeof(out_msg), rc);
+  EXPECT_EQ(stream_id_, out_msg.stream_id);
+  EXPECT_NE(0, out_msg.err);
+}
+
+TEST_F(RClientMessagesSuite, FrameRateErrorSRC) {
+  struct cras_client_stream_connected out_msg;
+  int rc;
+
+  get_iodev_return = (struct cras_iodev *)0xbaba;
+  cras_rstream_create_stream_out = rstream_;
+  cras_iodev_attach_stream_retval = 0;
+
+  connect_msg_.format.frame_rate = 0;
+  /* passed frame rate is zero, but iodev decides to do SRC. */
+  cras_iodev_set_format_frame_rate = 48000;
 
   rc = cras_rclient_message_from_client(rclient_, &connect_msg_.header);
   EXPECT_EQ(0, rc);
@@ -326,6 +349,8 @@ struct cras_iodev *cras_get_iodev_for_stream_type(uint32_t type,
 int cras_iodev_set_format(struct cras_iodev *iodev,
 			  struct cras_audio_format *fmt)
 {
+  if (cras_iodev_set_format_frame_rate)
+    fmt->frame_rate = cras_iodev_set_format_frame_rate;
   return 0;
 }
 
