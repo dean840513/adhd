@@ -271,6 +271,7 @@ int thread_add_stream(struct audio_thread *thread,
 		rc = init_device(odev, stream);
 		if (rc < 0) {
 			syslog(LOG_ERR, "Failed to open %s", odev->info.name);
+			delete_stream(thread, stream);
 			return AUDIO_THREAD_OUTPUT_DEV_ERROR;
 		}
 	}
@@ -279,6 +280,7 @@ int thread_add_stream(struct audio_thread *thread,
 		rc = init_device(idev, stream);
 		if (rc < 0) {
 			syslog(LOG_ERR, "Failed to open %s", idev->info.name);
+			delete_stream(thread, stream);
 			return AUDIO_THREAD_INPUT_DEV_ERROR;
 		}
 	}
