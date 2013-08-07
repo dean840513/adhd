@@ -1165,6 +1165,10 @@ int ucm_set_enabled(snd_use_case_mgr_t *mgr, const char *dev, int enabled) {
   return 0;
 }
 
+char *ucm_get_flag(snd_use_case_mgr_t *mgr, const char *flag_name) {
+  return NULL;
+}
+
 void cras_iodev_free_format(struct cras_iodev *iodev)
 {
 }
