@@ -520,6 +520,7 @@ static int write_streams(struct audio_thread *thread,
 	size_t streams_wait, num_mixed;
 	int max_fd;
 	int rc;
+	int max_frames = 0;
 
 	/* Timeout on reading before we under-run. Leaving time to mix. */
 	to.tv_sec = 0;
@@ -604,9 +605,19 @@ static int write_streams(struct audio_thread *thread,
 		if (!cras_stream_uses_output_hw(curr->stream->direction))
 			continue;
 		shm = cras_rstream_output_shm(curr->stream);
-		if (cras_shm_get_frames(shm) > 0)
+		if (cras_shm_get_frames(shm) > 0) {
 			write_limit = min(cras_shm_get_frames(shm),
 					  write_limit);
+			max_frames = max(max_frames, cras_shm_get_frames(shm));
+		}
+	}
+
+	if (max_frames == 0) {
+		/* Nothing to mix from any streams. Under run. */
+		unsigned int frame_bytes = cras_get_format_bytes(odev->format);
+
+		return cras_mix_mute_buffer(
+			dst, frame_bytes, min(odev->cb_threshold, write_limit));
 	}
 
 	DL_FOREACH_SAFE(thread->streams, curr, tmp) {
