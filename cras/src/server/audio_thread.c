@@ -681,7 +681,7 @@ static int thread_disconnect_stream(struct audio_thread* thread,
 }
 
 /* Put 'frames' worth of zero samples into odev. */
-void fill_odev_zeros(struct cras_iodev *odev, unsigned int frames)
+int fill_odev_zeros(struct cras_iodev *odev, unsigned int frames)
 {
 	uint8_t *dst;
 	unsigned int frame_bytes, frames_written;
@@ -693,12 +693,14 @@ void fill_odev_zeros(struct cras_iodev *odev, unsigned int frames)
 		rc = odev->get_buffer(odev, &dst, &frames_written);
 		if (rc < 0) {
 			syslog(LOG_ERR, "fill zeros fail: %d", rc);
-			return;
+			return rc;
 		}
 		memset(dst, 0, frames_written * frame_bytes);
 		odev->put_buffer(odev, frames_written);
 		frames -= frames_written;
 	}
+
+	return 0;
 }
 
 /* Builds an initial buffer to avoid an underrun. Adds cb_threshold latency. */
@@ -1516,6 +1518,7 @@ int drain_output_buffer(struct audio_thread *thread,
 	int filled_count;
 	int cb_threshold;
 	int buffer_frames;
+	int rc;
 
 	cb_threshold = thread->cb_threshold[CRAS_STREAM_OUTPUT];
 	buffer_frames = thread->buffer_frames[CRAS_STREAM_OUTPUT];
@@ -1532,7 +1535,9 @@ int drain_output_buffer(struct audio_thread *thread,
 
 	filled_count = MIN(buffer_frames - hw_level,
 			   cb_threshold - (int)odev->extra_silent_frames);
-	fill_odev_zeros(odev, filled_count);
+	rc = fill_odev_zeros(odev, filled_count);
+	if (rc)
+		return rc;
 	odev->extra_silent_frames += filled_count;
 
 	/* Sleep until 1.) There is only cb_threshold frames in buffer or
