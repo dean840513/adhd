@@ -1126,9 +1126,9 @@ static int write_streams(struct audio_thread *thread,
 							     curr->stream);
 					if (!output_streams_attached(thread))
 						return -EIO;
-				}
-				if (cras_shm_get_frames(shm) == 0)
+				} else if (cras_shm_get_frames(shm) == 0) {
 					curr->skip_mix = 1;
+				}
 			}
 			break;
 		}
