@@ -1559,51 +1559,6 @@ TEST_F(AddStreamSuite, AddRmTwoInputStreams) {
   add_rm_two_streams(CRAS_STREAM_INPUT);
 }
 
-TEST_F(AddStreamSuite, RmStreamLogLongestTimeout) {
-  int rc;
-  cras_rstream* new_stream;
-  cras_audio_shm *shm;
-  struct audio_thread *thread;
-
-  thread = audio_thread_create();
-
-  iodev_.format = &fmt_;
-  new_stream = (struct cras_rstream *)calloc(1, sizeof(*new_stream));
-  new_stream->fd = 55;
-  new_stream->buffer_frames = 65;
-  new_stream->cb_threshold = 80;
-  memcpy(&new_stream->format, &fmt_, sizeof(fmt_));
-
-  shm = cras_rstream_output_shm(new_stream);
-  shm->area = (struct cras_audio_shm_area *)calloc(1, sizeof(*shm->area));
-
-  thread_set_active_dev(thread, &iodev_);
-  rc = thread_add_stream(thread, new_stream);
-  ASSERT_EQ(0, rc);
-  EXPECT_EQ(1, thread->devs_open[CRAS_STREAM_OUTPUT]);
-  EXPECT_EQ(1, open_dev_called_);
-  EXPECT_EQ(65, thread->buffer_frames[CRAS_STREAM_OUTPUT]);
-  EXPECT_EQ(32, thread->cb_threshold[CRAS_STREAM_OUTPUT]);
-
-  is_open_ = 1;
-  cras_shm_set_longest_timeout(shm, 90);
-
-  //  remove the stream.
-  rc = thread_remove_stream(thread, new_stream);
-  EXPECT_EQ(0, rc);
-  EXPECT_EQ(1, iodev_.is_draining);
-
-  cras_system_add_select_fd_callback(cras_system_add_select_fd_callback_data);
-
-  EXPECT_EQ(1, cras_metrics_log_histogram_called);
-  EXPECT_STREQ(kStreamTimeoutMilliSeconds, cras_metrics_log_histogram_name);
-  EXPECT_EQ(90, cras_metrics_log_histogram_sample);
-
-  free(shm->area);
-  free(new_stream);
-  audio_thread_destroy(thread);
-}
-
 class ActiveDevicesSuite : public testing::Test {
   protected:
     virtual void SetUp() {
