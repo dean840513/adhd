@@ -20,10 +20,6 @@
  * the buffer size is captured when the audio thread wakes up.
  */
 static const unsigned int capture_extra_sleep_frames = 20;
-/* Adjust device's sample rate by this step faster or slower. Used
- * to make sure multiple active device has stable buffer level.
- */
-static const int coarse_rate_adjust_step = 3;
 
 struct dev_stream *dev_stream_create(struct cras_rstream *stream,
 				     unsigned int dev_id,
@@ -119,30 +115,17 @@ void dev_stream_destroy(struct dev_stream *dev_stream)
 }
 
 void dev_stream_set_dev_rate(struct dev_stream *dev_stream,
-			     unsigned int dev_rate,
-			     double dev_rate_ratio,
-			     double master_rate_ratio,
-			     int coarse_rate_adjust)
+			     unsigned int frame_rate)
 {
-	if (dev_stream->dev_id == dev_stream->stream->master_dev.dev_id) {
-		cras_fmt_conv_set_linear_resample_rates(
-				dev_stream->conv,
-				dev_rate,
-				dev_rate);
-		cras_frames_to_time(cras_rstream_get_cb_threshold(dev_stream->stream),
-				    dev_stream->stream->format.frame_rate *
-						dev_rate_ratio,
-				    &dev_stream->stream->sleep_interval_ts);
-	} else {
-		double new_rate = dev_rate * dev_rate_ratio /
-				master_rate_ratio +
-				coarse_rate_adjust_step * coarse_rate_adjust;
-		cras_fmt_conv_set_linear_resample_rates(
-				dev_stream->conv,
-				dev_rate,
-				new_rate);
+	if (dev_stream->conv) {
+		/* TODO(dgreid) - Should this be checking for master instead? */
+		/* TODO(dgreid) - adjust SRC */
+		return;
 	}
 
+	cras_frames_to_time(cras_rstream_get_cb_threshold(dev_stream->stream),
+			    frame_rate,
+			    &dev_stream->stream->sleep_interval_ts);
 }
 
 int dev_stream_mix(struct dev_stream *dev_stream,

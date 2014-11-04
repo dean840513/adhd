@@ -15,9 +15,6 @@
  *    dst_offset - The accumulated offset for resampled dst data.
  *    src_rate - The source sample rate.
  *    dst_rate - The destination sample rate.
- *    factor_num - The numerator of the rate factor used for SRC.
- *    factor_den - The denominator of the rate factor used for SRC.
- *    f - The rate factor used for linear resample.
  */
 struct linear_resampler {
 	unsigned int num_channels;
@@ -26,15 +23,13 @@ struct linear_resampler {
 	unsigned int dst_offset;
 	unsigned int src_rate;
 	unsigned int dst_rate;
-	unsigned int factor_num;
-	unsigned int factor_den;
 	float f;
 };
 
 struct linear_resampler *linear_resampler_create(unsigned int num_channels,
 					     unsigned int format_bytes,
-					     float src_rate,
-					     float dst_rate)
+					     unsigned int src_rate,
+					     unsigned int dst_rate)
 {
 	struct linear_resampler *lr;
 
@@ -42,7 +37,9 @@ struct linear_resampler *linear_resampler_create(unsigned int num_channels,
 	lr->num_channels = num_channels;
 	lr->format_bytes = format_bytes;
 
-	linear_resampler_set_rates(lr, src_rate, dst_rate);
+	lr->src_rate = src_rate;
+	lr->dst_rate = dst_rate;
+	lr->f = (float)dst_rate / src_rate;
 
 	return lr;
 }
@@ -54,13 +51,12 @@ void linear_resampler_destroy(struct linear_resampler *lr)
 }
 
 void linear_resampler_set_rates(struct linear_resampler *lr,
-				float from, float to)
+			      unsigned int from,
+			      unsigned int to)
 {
 	lr->src_rate = from;
 	lr->dst_rate = to;
 	lr->f = (float)to / from;
-	lr->factor_num = lr->dst_rate * 100;
-	lr->factor_den = lr->src_rate * 100;
 	lr->src_offset = 0;
 	lr->dst_offset = 0;
 }
@@ -122,10 +118,10 @@ unsigned int linear_resampler_resample(struct linear_resampler *lr,
 
 	lr->src_offset += *src_frames;
 	lr->dst_offset += dst_idx;
-	while ((lr->src_offset > lr->factor_den) &&
-	       (lr->dst_offset > lr->factor_num)) {
-		lr->src_offset -= lr->factor_den;
-		lr->dst_offset -= lr->factor_num;
+	while ((lr->src_offset > lr->src_rate) &&
+	       (lr->dst_offset > lr->dst_rate)) {
+		lr->src_offset -= lr->src_rate;
+		lr->dst_offset -= lr->dst_rate;
 	}
 
 	return dst_idx;
