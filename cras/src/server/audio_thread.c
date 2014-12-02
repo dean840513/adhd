@@ -1528,8 +1528,19 @@ static int capture_to_streams(struct audio_thread *thread,
 	struct cras_iodev *idev = adev->dev;
 	unsigned int frame_bytes = cras_get_format_bytes(idev->format);
 	snd_pcm_uframes_t remainder, hw_level;
+	int rc;
 
-	hw_level = idev->frames_queued(idev);
+	rc = idev->frames_queued(idev);
+	if (rc < 0)
+		return rc;
+	hw_level = rc;
+	if (hw_level < idev->min_cb_level / 2)
+		adev->coarse_rate_adjust = 1;
+	else if (hw_level > idev->max_cb_level * 2)
+		adev->coarse_rate_adjust = -1;
+	else
+		adev->coarse_rate_adjust = 0;
+
 	if (cras_iodev_update_rate(idev, hw_level))
 		update_estimated_rate(thread, adev);
 
@@ -1546,7 +1557,6 @@ static int capture_to_streams(struct audio_thread *thread,
 		struct dev_stream *stream;
 		uint8_t *hw_buffer;
 		unsigned int nread, total_read;
-		int rc;
 
 		nread = remainder;
 
