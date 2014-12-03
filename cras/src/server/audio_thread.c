@@ -648,23 +648,39 @@ static int thread_add_active_dev(struct audio_thread *thread,
 	return 0;
 }
 
-static void thread_rm_active_adev(struct audio_thread *thread,
-				  struct active_dev *adev)
+static struct active_dev *find_adev(struct active_dev *adev_list,
+				    struct cras_iodev *dev)
 {
-	enum CRAS_STREAM_DIRECTION dir = adev->dev->direction;
+	struct active_dev *adev;
+	DL_FOREACH(adev_list, adev)
+		if (adev->dev == dev)
+			return adev;
+	return NULL;
+}
+
+static void thread_rm_active_adev(struct audio_thread *thread,
+				  struct active_dev *dev_to_rm)
+{
+	enum CRAS_STREAM_DIRECTION dir = dev_to_rm->dev->direction;
 	struct active_dev *fallback_dev = thread->fallback_devs[dir];
+	struct active_dev *adev;
 	unsigned int last_device;
 	struct dev_stream *dev_stream;
 
-	if (adev == fallback_dev)
+	if (dev_to_rm == fallback_dev)
 		return;
 
-	DL_DELETE(thread->active_devs[dir], adev);
-	adev->dev->is_active = 0;
+	/* Do nothing if dev_to_rm wasn't already in the active dev list. */
+	adev = find_adev(thread->active_devs[dir], dev_to_rm->dev);
+	if (!adev)
+		return;
+
+	DL_DELETE(thread->active_devs[dir], dev_to_rm);
+	dev_to_rm->dev->is_active = 0;
 
 	audio_thread_event_log_data(atlog,
 				    AUDIO_THREAD_DEV_REMOVED,
-				    adev->dev->info.idx, 0, 0);
+				    dev_to_rm->dev->info.idx, 0, 0);
 
 	last_device = thread->active_devs[dir] == NULL;
 
@@ -673,29 +689,26 @@ static void thread_rm_active_adev(struct audio_thread *thread,
 		fallback_dev->dev->is_active = 1;
 	}
 
-	DL_FOREACH(adev->dev->streams, dev_stream) {
+	DL_FOREACH(dev_to_rm->dev->streams, dev_stream) {
 		if (last_device)
 			append_stream_to_dev(thread, fallback_dev,
 					     dev_stream->stream);
-		cras_iodev_rm_stream(adev->dev, dev_stream);
+		cras_iodev_rm_stream(dev_to_rm->dev, dev_stream);
 		dev_stream_destroy(dev_stream);
 	}
 
-	cras_iodev_close(adev->dev);
-	free(adev);
+	cras_iodev_close(dev_to_rm->dev);
+	free(dev_to_rm);
 }
 
 /* Handles messages from the main thread to remove an active device. */
 static void thread_rm_active_dev(struct audio_thread *thread,
 				 struct cras_iodev *iodev)
 {
-	struct active_dev *adev;
-	DL_FOREACH(thread->active_devs[iodev->direction], adev) {
-		if (adev->dev == iodev) {
-			thread_rm_active_adev(thread, adev);
-			break;
-		}
-	}
+	struct active_dev *adev = find_adev(
+			thread->active_devs[iodev->direction], iodev);
+	if (adev)
+		thread_rm_active_adev(thread, adev);
 }
 
 /* Remove stream from the audio thread. If this is the last stream to be
