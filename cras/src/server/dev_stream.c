@@ -405,7 +405,8 @@ unsigned int dev_stream_cb_threshold(const struct dev_stream *dev_stream)
 						      cb_threshold);
 }
 
-unsigned int dev_stream_capture_avail(const struct dev_stream *dev_stream)
+unsigned int dev_stream_capture_avail(const struct dev_stream *dev_stream,
+				      unsigned int *needed)
 {
 	struct cras_audio_shm *shm;
 	struct cras_rstream *rstream = dev_stream->stream;
@@ -413,11 +414,15 @@ unsigned int dev_stream_capture_avail(const struct dev_stream *dev_stream)
 	unsigned int conv_buf_level;
 	unsigned int format_bytes;
 	unsigned int wlimit;
+	unsigned int cb_threshold = cras_rstream_get_cb_threshold(rstream);
+	unsigned int dev_offset =
+		cras_rstream_dev_offset(rstream, dev_stream->dev_id);
 
 	shm = cras_rstream_input_shm(rstream);
+	*needed = 0;
 
 	wlimit = cras_rstream_get_cb_threshold(rstream);
-	wlimit -= cras_rstream_dev_offset(rstream, dev_stream->dev_id);
+	wlimit -= dev_offset;
 	cras_shm_get_writeable_frames(shm, wlimit, &frames_avail);
 
 	if (!dev_stream->conv)
@@ -438,6 +443,12 @@ unsigned int dev_stream_capture_avail(const struct dev_stream *dev_stream)
 	frames_avail = MIN(frames_avail,
 			   buf_available_bytes(dev_stream->conv_buffer) /
 					format_bytes);
+
+	dev_offset += conv_buf_level;
+	if (dev_offset < cb_threshold)
+		*needed = cras_fmt_conv_out_frames_to_in(dev_stream->conv,
+				cb_threshold - dev_offset);
+
 	return cras_fmt_conv_out_frames_to_in(dev_stream->conv, frames_avail);
 }
 
@@ -471,18 +482,9 @@ int dev_stream_capture_update_rstream(struct dev_stream *dev_stream)
 
 	/* If it isn't time for this stream then skip it. */
 	clock_gettime(CLOCK_MONOTONIC, &now);
-	if (!timespec_after(&now, &rstream->next_cb_ts))
-		return 0;
 
-	if (!cras_rstream_input_level_met(rstream)) {
-		struct timespec extra_sleep;
-
-		cras_frames_to_time(capture_extra_sleep_frames,
-				    rstream->format.frame_rate, &extra_sleep);
-		add_timespecs(&rstream->next_cb_ts, &extra_sleep);
-		syslog(LOG_INFO, "short capture samples");
+	if (!cras_rstream_input_level_met(rstream))
 		return 0;
-	}
 
 	/* Enough data for this stream. */
 
@@ -490,11 +492,6 @@ int dev_stream_capture_update_rstream(struct dev_stream *dev_stream)
 				    rstream->stream_id,
 				    str_cb_threshold,
 				    rstream->shm.area->read_buf_idx);
-
-	/* Tell the client that samples are ready and mark the next time it
-	 * should be called back. */
-	add_timespecs(&rstream->next_cb_ts, &rstream->sleep_interval_ts);
-	check_next_wake_time(dev_stream);
 
 	return cras_rstream_audio_ready(rstream, str_cb_threshold);
 }

@@ -2294,21 +2294,14 @@ int cras_system_get_mute() {
   return 0;
 }
 
-int cras_system_get_capture_mute() {
+unsigned int dev_stream_capture_avail(const struct dev_stream *dev_stream,
+				      unsigned int *needed)
+{
   return 0;
-}
 
-void cras_rstream_destroy(struct cras_rstream *stream) {
-  cras_rstream_destroy_called++;
 }
-
-void loopback_iodev_set_format(struct cras_iodev *loopback_dev,
-                               const struct cras_audio_format *fmt) {
-}
-
-int loopback_iodev_add_audio(struct cras_iodev *loopback_dev,
-                             const uint8_t *audio,
-                             unsigned int count) {
+unsigned int dev_stream_cb_threshold(const struct dev_stream *dev_stream)
+{
   return 0;
 }
 
