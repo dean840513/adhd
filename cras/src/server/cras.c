@@ -14,8 +14,11 @@
 #include "cras_system_state.h"
 #include "cras_dsp.h"
 
+static int enable_hfp;
+
 static struct option long_options[] = {
 	{"syslog_mask", required_argument, 0, 'l'},
+	{"enable_hfp", no_argument, &enable_hfp, 1},
 	{0, 0, 0, 0}
 };
 
@@ -77,7 +80,7 @@ int main(int argc, char **argv)
 	loopback_iodev_create(CRAS_STREAM_POST_MIX_PRE_DSP);
 
 	/* Start the server. */
-	cras_server_run();
+	cras_server_run(enable_hfp);
 
 	return 0;
 }
