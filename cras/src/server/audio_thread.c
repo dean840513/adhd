@@ -1346,9 +1346,10 @@ int drain_output_buffer(struct active_dev *adev)
 
 	buffer_frames = odev->buffer_size;
 
-	hw_level = odev->frames_queued(odev);
-	if (hw_level < 0)
-		return hw_level;
+	rc = cras_iodev_frames_queued(odev);
+	if (rc < 0)
+		return rc;
+	hw_level = rc;
 
 	audio_thread_event_log_data(atlog,
 				    AUDIO_THREAD_DRAIN_OUTPUT,
@@ -1383,13 +1384,13 @@ static void set_odev_wake_times(struct active_dev *dev_list)
 	DL_FOREACH(dev_list, adev) {
 		struct timespec sleep_time;
 		int hw_level;
+		int rc;
 
 		if (!device_open(adev->dev))
 			continue;
 
-		hw_level = adev->dev->frames_queued(adev->dev);
-		if (hw_level < 0)
-			return;
+		rc = cras_iodev_frames_queued(adev->dev);
+		hw_level = (rc < 0) ? 0 : rc;
 
 		audio_thread_event_log_data(atlog,
 					    AUDIO_THREAD_SET_DEV_WAKE,
@@ -1472,7 +1473,7 @@ static int write_output_samples(struct audio_thread *thread,
 	if (odev->is_draining)
 		return drain_output_buffer(adev);
 
-	rc = odev->frames_queued(odev);
+	rc = cras_iodev_frames_queued(odev);
 	if (rc < 0)
 		return rc;
 	hw_level = rc;
@@ -1611,7 +1612,7 @@ static int capture_to_streams(struct audio_thread *thread,
 	snd_pcm_uframes_t remainder, hw_level;
 	int rc;
 
-	rc = idev->frames_queued(idev);
+	rc = cras_iodev_frames_queued(idev);
 	if (rc < 0)
 		return rc;
 	hw_level = rc;
@@ -1705,7 +1706,7 @@ static int send_captured_samples(struct audio_thread *thread)
 		if (!device_open(adev->dev))
 			continue;
 
-		curr_level = adev->dev->frames_queued(adev->dev);
+		curr_level = cras_iodev_frames_queued(adev->dev);
 
 		DL_FOREACH(adev->dev->streams, stream) {
 			dev_stream_capture_update_rstream(stream);
