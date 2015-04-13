@@ -51,7 +51,6 @@ struct audio_thread_msg {
 struct audio_thread_open_device_msg {
 	struct audio_thread_msg header;
 	struct cras_iodev *dev;
-	int is_device_removal;
 };
 
 struct audio_thread_add_rm_stream_msg {
@@ -411,8 +410,7 @@ static void thread_rm_open_adev(struct audio_thread *thread,
 
 /* Handles messages from the main thread to remove an active device. */
 static int thread_rm_open_dev(struct audio_thread *thread,
-			      struct cras_iodev *iodev,
-			      int is_device_removal)
+			      struct cras_iodev *iodev)
 {
 	struct open_dev *adev = find_adev(
 			thread->open_devs[iodev->direction], iodev);
@@ -860,8 +858,7 @@ static int handle_playback_thread_message(struct audio_thread *thread)
 		struct audio_thread_open_device_msg *rmsg;
 
 		rmsg = (struct audio_thread_open_device_msg *)msg;
-		ret = thread_rm_open_dev(thread, rmsg->dev,
-					 rmsg->is_device_removal);
+		ret = thread_rm_open_dev(thread, rmsg->dev);
 		break;
 	}
 	case AUDIO_THREAD_STOP:
@@ -1715,8 +1712,7 @@ int audio_thread_add_open_dev(struct audio_thread *thread,
 }
 
 int audio_thread_rm_open_dev(struct audio_thread *thread,
-			     struct cras_iodev *dev,
-			     int is_device_removal)
+			     struct cras_iodev *dev)
 {
 	struct audio_thread_open_device_msg msg;
 
@@ -1727,7 +1723,6 @@ int audio_thread_rm_open_dev(struct audio_thread *thread,
 	msg.header.id = AUDIO_THREAD_RM_OPEN_DEV;
 	msg.header.length = sizeof(struct audio_thread_open_device_msg);
 	msg.dev = dev;
-	msg.is_device_removal = is_device_removal;
 	return audio_thread_post_message(thread, &msg.header);
 }
 
