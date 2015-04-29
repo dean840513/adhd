@@ -66,8 +66,6 @@ static struct audio_thread *audio_thread;
 static struct stream_list *stream_list;
 /* Idle device timer. */
 static struct cras_timer *idle_timer;
-/* Flag to indicate that the stream list is disconnected from audio thread. */
-static int stream_list_suspended = 0;
 
 static void nodes_changed_prepare(struct cras_alert *alert);
 static void active_node_changed_prepare(struct cras_alert *alert);
@@ -410,8 +408,6 @@ static void suspend_devs()
 						       NULL);
 		}
 	}
-	stream_list_suspended = 1;
-
 	DL_FOREACH(enabled_devs[CRAS_STREAM_OUTPUT], edev) {
 		close_dev(edev->dev);
 	}
@@ -425,7 +421,6 @@ static void resume_devs()
 	struct enabled_dev *edev;
 	struct cras_rstream *rstream;
 
-	stream_list_suspended = 0;
 	DL_FOREACH(stream_list_get(stream_list), rstream) {
 		if (rstream->is_pinned) {
 			struct cras_iodev *dev;
@@ -483,9 +478,6 @@ static int stream_added_cb(struct cras_rstream *rstream)
 {
 	struct enabled_dev *edev;
 	int rc;
-
-	if (stream_list_suspended)
-		return 0;
 
 	/* Check that the target device is valid for pinned streams. */
 	if (rstream->is_pinned) {
@@ -592,17 +584,11 @@ static int enable_device(struct cras_iodev *dev)
 	edev->dev = dev;
 	DL_APPEND(enabled_devs[dir], edev);
 
-	/* If enable_device is called after suspend, for example bluetooth
-	 * profile switching, don't add back the stream list. */
-	if (stream_list_suspended) {
-		/* If there are active streams to attach to this device,
-		 * open it. */
-		DL_FOREACH(stream_list_get(stream_list), stream) {
-			if (stream->direction == dir && !stream->is_pinned) {
-				init_device(dev, stream);
-				audio_thread_add_stream(audio_thread,
-							stream, dev);
-			}
+	/* If there are active streams to attach to this device, open it. */
+	DL_FOREACH(stream_list_get(stream_list), stream) {
+		if (stream->direction == dir && !stream->is_pinned) {
+			init_device(dev, stream);
+			audio_thread_add_stream(audio_thread, stream, dev);
 		}
 	}
 
