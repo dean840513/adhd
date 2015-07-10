@@ -185,18 +185,6 @@ static int put_buffer(struct cras_iodev *iodev, unsigned nwritten)
 	return 0;
 }
 
-static int flush_buffer(struct cras_iodev *iodev)
-{
-	struct hfp_io *hfpio = (struct hfp_io *)iodev;
-	unsigned nframes;
-
-	if (iodev->direction == CRAS_STREAM_INPUT) {
-		nframes = hfp_buf_queued(hfpio->info, iodev);
-		hfp_buf_release(hfpio->info, iodev, nframes);
-	}
-	return 0;
-}
-
 static void update_active_node(struct cras_iodev *iodev)
 {
 }
@@ -250,7 +238,6 @@ struct cras_iodev *hfp_iodev_create(
 	iodev->delay_frames = delay_frames;
 	iodev->get_buffer = get_buffer;
 	iodev->put_buffer = put_buffer;
-	iodev->flush_buffer = flush_buffer;
 	iodev->close_dev = close_dev;
 	iodev->update_supported_formats = update_supported_formats;
 	iodev->update_active_node = update_active_node;

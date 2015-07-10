@@ -338,18 +338,6 @@ static int put_buffer(struct cras_iodev *iodev, unsigned nwritten)
 				     &aio->num_underruns);
 }
 
-static int flush_buffer(struct cras_iodev *iodev)
-{
-	struct alsa_io *aio = (struct alsa_io *)iodev;
-	snd_pcm_uframes_t nframes;
-
-	if (iodev->direction == CRAS_STREAM_INPUT) {
-		nframes = snd_pcm_forwardable(aio->handle);
-		return snd_pcm_forward(aio->handle, nframes);
-	}
-	return 0;
-}
-
 /* Gets the node in the ionode list of given iodev which is the
  * best fit to set as active node.
  */
@@ -1132,7 +1120,6 @@ struct cras_iodev *alsa_iodev_create(size_t card_index,
 	iodev->delay_frames = delay_frames;
 	iodev->get_buffer = get_buffer;
 	iodev->put_buffer = put_buffer;
-	iodev->flush_buffer = flush_buffer;
 	iodev->dev_running = dev_running;
 	iodev->update_active_node = update_active_node;
 	iodev->update_channel_layout = update_channel_layout;
