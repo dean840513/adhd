@@ -43,6 +43,7 @@ class StreamDeviceSuite : public testing::Test {
       iodev->delay_frames = delay_frames;
       iodev->get_buffer = get_buffer;
       iodev->put_buffer = put_buffer;
+      iodev->flush_buffer = flush_buffer;
       iodev->ext_format = &format_;
     }
 
@@ -112,6 +113,10 @@ class StreamDeviceSuite : public testing::Test {
 
     static int put_buffer(cras_iodev* iodev, unsigned int num) {
       free(area_);
+      return 0;
+    }
+
+    static int flush_buffer(cras_iodev *iodev) {
       return 0;
     }
 
