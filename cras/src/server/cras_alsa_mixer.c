@@ -536,19 +536,13 @@ void cras_alsa_mixer_set_mute(struct cras_alsa_mixer *cras_mixer,
 }
 
 void cras_alsa_mixer_set_capture_mute(struct cras_alsa_mixer *cras_mixer,
-				      int muted,
-				      struct mixer_volume_control *mixer_input)
+				      int muted)
 {
 	assert(cras_mixer);
-	if (cras_mixer->capture_switch) {
-		snd_mixer_selem_set_capture_switch_all(
-				cras_mixer->capture_switch, !muted);
+	if (cras_mixer->capture_switch == NULL)
 		return;
-	}
-	if (mixer_input && snd_mixer_selem_has_capture_switch(
-			mixer_input->elem))
-		snd_mixer_selem_set_capture_switch_all(
-				mixer_input->elem, !muted);
+	snd_mixer_selem_set_capture_switch_all(cras_mixer->capture_switch,
+					       !muted);
 }
 
 void cras_alsa_mixer_list_outputs(struct cras_alsa_mixer *cras_mixer,
