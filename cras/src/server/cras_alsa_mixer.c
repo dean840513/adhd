@@ -432,14 +432,14 @@ void cras_alsa_mixer_set_dBFS(struct cras_alsa_mixer *cras_mixer,
 						    1);
 }
 
-long cras_alsa_mixer_get_dB_range(struct cras_alsa_mixer *cras_mixer)
+inline long cras_alsa_mixer_get_dB_range(struct cras_alsa_mixer *cras_mixer)
 {
 	if (!cras_mixer)
 		return 0;
 	return cras_mixer->max_volume_dB - cras_mixer->min_volume_dB;
 }
 
-long cras_alsa_mixer_get_output_dB_range(
+inline long cras_alsa_mixer_get_output_dB_range(
 		struct cras_alsa_mixer_output *mixer_output)
 {
 	if (!mixer_output || !mixer_output->elem || !mixer_output->has_volume)
