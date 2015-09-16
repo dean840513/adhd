@@ -13,31 +13,12 @@
 #include "cras_volume_curve.h"
 #include "utlist.h"
 
-/* Represents an ALSA control element. Each device can have several of these,
- * each potentially having independent volume and mute controls.
- * elem - ALSA mixer element.
- * has_volume - non-zero indicates there is a volume control.
- * has_mute - non-zero indicates there is a mute switch.
- */
-struct mixer_control {
-	snd_mixer_elem_t *elem;
-	int has_volume;
-	int has_mute;
-	struct mixer_control *prev, *next;
-};
-
 /* Represents an ALSA control element related to a specific output such as
  * speakers or headphones.  A device can have several of these, each potentially
- * having independent volume and mute controls.
- * max_volume_dB - Maximum volume available in the volume control.
- * min_volume_dB - Minimum volume available in the volume control.
- * volume_curve - Curve for this output.
- */
+ * having independent volume and mute controls. */
 struct mixer_output_control {
-	struct mixer_control base;
-	long max_volume_dB;
-	long min_volume_dB;
-	struct cras_volume_curve *volume_curve;
+	struct cras_alsa_mixer_output properties;
+	struct mixer_output_control *prev, *next;
 };
 
 /* Holds a reference to the opened mixer and the volume controls.
@@ -54,10 +35,10 @@ struct mixer_output_control {
  */
 struct cras_alsa_mixer {
 	snd_mixer_t *mixer;
-	struct mixer_control *main_volume_controls;
-	struct mixer_control *output_controls;
+	struct mixer_volume_control *main_volume_controls;
+	struct mixer_output_control *output_controls;
 	snd_mixer_elem_t *playback_switch;
-	struct mixer_control *main_capture_controls;
+	struct mixer_volume_control *main_capture_controls;
 	snd_mixer_elem_t *capture_switch;
 	struct cras_volume_curve *volume_curve;
 	long max_volume_dB;
@@ -113,10 +94,10 @@ static int add_main_volume_control(struct cras_alsa_mixer *cmix,
 				   snd_mixer_elem_t *elem)
 {
 	if (snd_mixer_selem_has_playback_volume(elem)) {
-		struct mixer_control *c, *next;
+		struct mixer_volume_control *c, *next;
 		long min, max;
 
-		c = (struct mixer_control *)calloc(1, sizeof(*c));
+		c = calloc(1, sizeof(*c));
 		if (c == NULL) {
 			syslog(LOG_ERR, "No memory for mixer.");
 			return -ENOMEM;
@@ -141,6 +122,7 @@ static int add_main_volume_control(struct cras_alsa_mixer *cmix,
 		}
 
 		DL_INSERT(cmix->main_volume_controls, next, c);
+
 	}
 
 	/* If cmix doesn't yet have a playback switch and this is a playback
@@ -162,9 +144,9 @@ static int add_main_capture_control(struct cras_alsa_mixer *cmix,
 		return 0;
 
 	if (snd_mixer_selem_has_capture_volume(elem)) {
-		struct mixer_control *c;
+		struct mixer_volume_control *c;
 
-		c = (struct mixer_control *)calloc(1, sizeof(*c));
+		c = calloc(1, sizeof(*c));
 		if (c == NULL) {
 			syslog(LOG_ERR, "No memory for control.");
 			return -ENOMEM;
@@ -190,11 +172,11 @@ static int add_main_capture_control(struct cras_alsa_mixer *cmix,
 /* Creates a volume curve for a new output. */
 static struct cras_volume_curve *create_volume_curve_for_output(
 		const struct cras_alsa_mixer *cmix,
-		snd_mixer_elem_t *elem)
+		struct cras_alsa_mixer_output *output)
 {
 	const char *output_name;
 
-	output_name = snd_mixer_selem_get_name(elem);
+	output_name = snd_mixer_selem_get_name(output->elem);
 	return cras_card_config_get_volume_curve_for_control(cmix->config,
 							     output_name);
 }
@@ -204,30 +186,29 @@ static int add_output_control(struct cras_alsa_mixer *cmix,
 			      snd_mixer_elem_t *elem)
 {
 	int index; /* Index part of mixer simple element */
-	struct mixer_control *c;
-	struct mixer_output_control *output;
+	struct mixer_output_control *c;
 	long min, max;
 
 	index = snd_mixer_selem_get_index(elem);
 	syslog(LOG_DEBUG, "Add output control: %s,%d\n",
 	       snd_mixer_selem_get_name(elem), index);
 
-	output = (struct mixer_output_control *)calloc(1, sizeof(*output));
-	if (output == NULL) {
+	c = calloc(1, sizeof(*c));
+	if (c == NULL) {
 		syslog(LOG_ERR, "No memory for output control.");
 		return -ENOMEM;
 	}
 
 	if (snd_mixer_selem_get_playback_dB_range(elem, &min, &max) == 0) {
-		output->max_volume_dB = max;
-		output->min_volume_dB = min;
+		c->properties.max_volume_dB = max;
+		c->properties.min_volume_dB = min;
 	}
-	output->volume_curve = create_volume_curve_for_output(cmix, elem);
 
-	c = &output->base;
-	c->elem = elem;
-	c->has_volume = snd_mixer_selem_has_playback_volume(elem);
-	c->has_mute = snd_mixer_selem_has_playback_switch(elem);
+	c->properties.elem = elem;
+	c->properties.has_volume = snd_mixer_selem_has_playback_volume(elem);
+	c->properties.has_mute = snd_mixer_selem_has_playback_switch(elem);
+	c->properties.volume_curve =
+		create_volume_curve_for_output(cmix, &c->properties);
 	DL_APPEND(cmix->output_controls, c);
 
 	return 0;
@@ -265,9 +246,9 @@ struct cras_alsa_mixer *cras_alsa_mixer_create(
 	snd_mixer_elem_t *elem;
 	struct cras_alsa_mixer *cmix;
 	snd_mixer_elem_t *other_elem = NULL;
-	long other_dB_range = 0;
+	unsigned int other_dB_range = 0;
 
-	cmix = (struct cras_alsa_mixer *)calloc(1, sizeof(*cmix));
+	cmix = calloc(1, sizeof(*cmix));
 	if (cmix == NULL)
 		return NULL;
 
@@ -356,7 +337,8 @@ struct cras_alsa_mixer *cras_alsa_mixer_create(
 
 void cras_alsa_mixer_destroy(struct cras_alsa_mixer *cras_mixer)
 {
-	struct mixer_control *c;
+	struct mixer_volume_control *c;
+	struct mixer_output_control *output;
 
 	assert(cras_mixer);
 
@@ -368,11 +350,9 @@ void cras_alsa_mixer_destroy(struct cras_alsa_mixer *cras_mixer)
 		DL_DELETE(cras_mixer->main_capture_controls, c);
 		free(c);
 	}
-	DL_FOREACH(cras_mixer->output_controls, c) {
-		struct mixer_output_control *output;
-		output = (struct mixer_output_control *)c;
-		cras_volume_curve_destroy(output->volume_curve);
-		DL_DELETE(cras_mixer->output_controls, c);
+	DL_FOREACH(cras_mixer->output_controls, output) {
+		cras_volume_curve_destroy(output->properties.volume_curve);
+		DL_DELETE(cras_mixer->output_controls, output);
 		free(output);
 	}
 	cras_volume_curve_destroy(cras_mixer->volume_curve);
@@ -380,7 +360,7 @@ void cras_alsa_mixer_destroy(struct cras_alsa_mixer *cras_mixer)
 	free(cras_mixer);
 }
 
-struct mixer_control *cras_alsa_mixer_get_input_matching_name(
+struct mixer_volume_control *cras_alsa_mixer_get_input_matching_name(
 		struct cras_alsa_mixer *cras_mixer,
 		const char *control_name)
 {
@@ -393,9 +373,9 @@ struct mixer_control *cras_alsa_mixer_get_input_matching_name(
 		if (name == NULL)
 			continue;
 		if (strcmp(control_name, name) == 0) {
-			struct mixer_control *c;
+			struct mixer_volume_control *c;
 
-			c = (struct mixer_control *)calloc(1, sizeof(*c));
+			c = calloc(1, sizeof(*c));
 			if (c == NULL) {
 				syslog(LOG_ERR, "No memory for control.");
 				return NULL;
@@ -418,11 +398,9 @@ const struct cras_volume_curve *cras_alsa_mixer_default_volume_curve(
 
 void cras_alsa_mixer_set_dBFS(struct cras_alsa_mixer *cras_mixer,
 			      long dBFS,
-			      struct mixer_control *mixer_output)
+			      struct cras_alsa_mixer_output *mixer_output)
 {
-	struct mixer_control *c;
-	struct mixer_output_control *output;
-	output = (struct mixer_output_control *)mixer_output;
+	struct mixer_volume_control *c;
 	long to_set;
 
 	assert(cras_mixer);
@@ -432,7 +410,7 @@ void cras_alsa_mixer_set_dBFS(struct cras_alsa_mixer *cras_mixer,
 	 */
 	to_set = dBFS + cras_mixer->max_volume_dB;
 	if (mixer_output)
-		to_set += output->max_volume_dB;
+		to_set += mixer_output->max_volume_dB;
 	/* Go through all the controls, set the volume level for each,
 	 * taking the value closest but greater than the desired volume.  If the
 	 * entire volume can't be set on the current control, move on to the
@@ -462,20 +440,18 @@ long cras_alsa_mixer_get_dB_range(struct cras_alsa_mixer *cras_mixer)
 }
 
 long cras_alsa_mixer_get_output_dB_range(
-		struct mixer_control *mixer_output)
+		struct cras_alsa_mixer_output *mixer_output)
 {
-	struct mixer_output_control *output;
 	if (!mixer_output || !mixer_output->elem || !mixer_output->has_volume)
 		return 0;
-	output = (struct mixer_output_control *)mixer_output;
-	return output->max_volume_dB - output->min_volume_dB;
+	return mixer_output->max_volume_dB - mixer_output->min_volume_dB;
 }
 
 void cras_alsa_mixer_set_capture_dBFS(struct cras_alsa_mixer *cras_mixer,
 				      long dBFS,
-				      struct mixer_control *mixer_input)
+				      struct mixer_volume_control *mixer_input)
 {
-	struct mixer_control *c;
+	struct mixer_volume_control *c;
 	long to_set;
 
 	assert(cras_mixer);
@@ -495,7 +471,7 @@ void cras_alsa_mixer_set_capture_dBFS(struct cras_alsa_mixer *cras_mixer,
 	}
 
 	/* Apply the reset to input specific control */
-	if (mixer_input && mixer_input->elem && mixer_input->has_volume)
+	if (mixer_input)
 		snd_mixer_selem_set_capture_dB_all(mixer_input->elem,
 						   to_set, 1);
 	assert(cras_mixer);
@@ -503,9 +479,9 @@ void cras_alsa_mixer_set_capture_dBFS(struct cras_alsa_mixer *cras_mixer,
 
 long cras_alsa_mixer_get_minimum_capture_gain(
                 struct cras_alsa_mixer *cmix,
-		struct mixer_control *mixer_input)
+		struct mixer_volume_control *mixer_input)
 {
-	struct mixer_control *c;
+	struct mixer_volume_control *c;
 	long min, max, total_min;
 
 	assert(cmix);
@@ -523,9 +499,9 @@ long cras_alsa_mixer_get_minimum_capture_gain(
 }
 
 long cras_alsa_mixer_get_maximum_capture_gain(struct cras_alsa_mixer *cmix,
-		struct mixer_control *mixer_input)
+		struct mixer_volume_control *mixer_input)
 {
-	struct mixer_control *c;
+	struct mixer_volume_control *c;
 	long min, max, total_max;
 
 	assert(cmix);
@@ -544,7 +520,7 @@ long cras_alsa_mixer_get_maximum_capture_gain(struct cras_alsa_mixer *cmix,
 
 void cras_alsa_mixer_set_mute(struct cras_alsa_mixer *cras_mixer,
 			      int muted,
-			      struct mixer_control *mixer_output)
+			      struct cras_alsa_mixer_output *mixer_output)
 {
 	assert(cras_mixer);
 	if (cras_mixer->playback_switch) {
@@ -559,7 +535,7 @@ void cras_alsa_mixer_set_mute(struct cras_alsa_mixer *cras_mixer,
 
 void cras_alsa_mixer_set_capture_mute(struct cras_alsa_mixer *cras_mixer,
 				      int muted,
-				      struct mixer_control *mixer_input)
+				      struct mixer_volume_control *mixer_input)
 {
 	assert(cras_mixer);
 	if (cras_mixer->capture_switch) {
@@ -567,49 +543,50 @@ void cras_alsa_mixer_set_capture_mute(struct cras_alsa_mixer *cras_mixer,
 				cras_mixer->capture_switch, !muted);
 		return;
 	}
-	if (mixer_input && mixer_input->has_mute)
+	if (mixer_input && snd_mixer_selem_has_capture_switch(
+			mixer_input->elem))
 		snd_mixer_selem_set_capture_switch_all(
 				mixer_input->elem, !muted);
 }
 
 void cras_alsa_mixer_list_outputs(struct cras_alsa_mixer *cras_mixer,
-				  cras_alsa_mixer_control_callback cb,
+				  cras_alsa_mixer_output_callback cb,
 				  void *cb_arg)
 {
 	assert(cras_mixer);
-	struct mixer_control *output;
+	struct mixer_output_control *output;
 
 	DL_FOREACH(cras_mixer->output_controls, output)
-		cb(output, cb_arg);
+		cb(&output->properties, cb_arg);
 }
 
-const char *cras_alsa_mixer_get_control_name(
-		const struct mixer_control *control)
+const char *cras_alsa_mixer_get_output_name(
+		const struct cras_alsa_mixer_output *output)
 {
-	return snd_mixer_selem_get_name(control->elem);
+	return snd_mixer_selem_get_name(output->elem);
 }
 
-struct mixer_control *cras_alsa_mixer_get_output_matching_name(
+struct cras_alsa_mixer_output *cras_alsa_mixer_get_output_matching_name(
 		const struct cras_alsa_mixer *cras_mixer,
 		const char * const name)
 {
-	struct mixer_control *output;
+	struct mixer_output_control *output;
 
 	assert(cras_mixer);
 	DL_FOREACH(cras_mixer->output_controls, output) {
 		const char *elem_name;
 
-		elem_name = snd_mixer_selem_get_name(output->elem);
+		elem_name = snd_mixer_selem_get_name(output->properties.elem);
 		if (elem_name == NULL)
 			continue;
 		if (strstr(name, elem_name))
-			return output;
+			return &output->properties;
 	}
 	return NULL;
 }
 
 int cras_alsa_mixer_set_output_active_state(
-		struct mixer_control *output,
+		struct cras_alsa_mixer_output *output,
 		int active)
 {
 	assert(output);
@@ -628,15 +605,4 @@ struct cras_volume_curve *cras_alsa_mixer_create_volume_curve_for_name(
 	else
 		return cras_card_config_get_volume_curve_for_control(NULL,
 								     name);
-}
-
-struct cras_volume_curve *cras_alsa_mixer_get_output_volume_curve(
-		const struct mixer_control *control)
-{
-	struct mixer_output_control *output;
-	output = (struct mixer_output_control *)control;
-	if (output)
-		return output->volume_curve;
-	else
-		return NULL;
 }
