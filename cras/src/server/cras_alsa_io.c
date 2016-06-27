@@ -285,35 +285,27 @@ static int dev_running(const struct cras_iodev *iodev)
 {
 	struct alsa_io *aio = (struct alsa_io *)iodev;
 	snd_pcm_t *handle = aio->handle;
-
-	return snd_pcm_state(handle) == SND_PCM_STATE_RUNNING;
-}
-
-static int start(const struct cras_iodev *iodev)
-{
-	struct alsa_io *aio = (struct alsa_io *)iodev;
-	snd_pcm_t *handle = aio->handle;
 	int rc;
 
 	if (snd_pcm_state(handle) == SND_PCM_STATE_RUNNING)
-		return 0;
+		return 1;
 
 	if (snd_pcm_state(handle) == SND_PCM_STATE_SUSPENDED) {
 		rc = cras_alsa_attempt_resume(handle);
 		if (rc < 0) {
 			syslog(LOG_ERR, "Resume error: %s", snd_strerror(rc));
-			return rc;
+			return 0;
 		}
 		cras_iodev_reset_rate_estimator(iodev);
 	} else {
 		rc = cras_alsa_pcm_start(handle);
 		if (rc < 0) {
 			syslog(LOG_ERR, "Start error: %s", snd_strerror(rc));
-			return rc;
+			return 0;
 		}
 	}
 
-	return 0;
+	return 1;
 }
 
 static int get_buffer(struct cras_iodev *iodev,
@@ -1332,7 +1324,6 @@ struct cras_iodev *alsa_iodev_create(size_t card_index,
 	iodev->get_buffer = get_buffer;
 	iodev->put_buffer = put_buffer;
 	iodev->flush_buffer = flush_buffer;
-	iodev->start = start;
 	iodev->dev_running = dev_running;
 	iodev->update_active_node = update_active_node;
 	iodev->update_channel_layout = update_channel_layout;

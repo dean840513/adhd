@@ -250,14 +250,6 @@ static int frames_queued(const struct cras_iodev *iodev)
 	return dev->frames_queued(dev);
 }
 
-static int start(const struct cras_iodev *iodev)
-{
-	struct cras_iodev *dev = active_profile_dev(iodev);
-	if (!dev)
-		return -EINVAL;
-	return dev->start(dev);
-}
-
 static int dev_running(const struct cras_iodev *iodev)
 {
 	struct cras_iodev *dev = active_profile_dev(iodev);
@@ -356,7 +348,6 @@ struct cras_iodev *cras_bt_io_create(struct cras_bt_device *device,
 	iodev->is_open = is_open; /* Needed by thread_add_stream */
 	iodev->frames_queued = frames_queued;
 	iodev->dev_running = dev_running;
-	iodev->start = start;
 	iodev->delay_frames = delay_frames;
 	iodev->get_buffer = get_buffer;
 	iodev->put_buffer = put_buffer;

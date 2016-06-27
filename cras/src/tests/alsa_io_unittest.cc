@@ -113,8 +113,6 @@ static long ucm_get_max_software_gain_value;
 static long cras_system_set_capture_gain_limits_set_value[2];
 static long cras_alsa_mixer_get_minimum_capture_gain_ret_value;
 static long cras_alsa_mixer_get_maximum_capture_gain_ret_value;
-static snd_pcm_state_t snd_pcm_state_ret;
-static int cras_alsa_attempt_resume_called;
 
 void ResetStubData() {
   int i;
@@ -180,8 +178,6 @@ void ResetStubData() {
   cras_system_set_capture_gain_limits_set_value[1] = -1;
   cras_alsa_mixer_get_minimum_capture_gain_ret_value = 0;
   cras_alsa_mixer_get_maximum_capture_gain_ret_value = 0;
-  snd_pcm_state_ret = SND_PCM_STATE_RUNNING;
-  cras_alsa_attempt_resume_called = 0;
 }
 
 static long fake_get_dBFS(const cras_volume_curve *curve, size_t volume)
@@ -582,52 +578,6 @@ TEST(AlsaIoInit, UpdateActiveNode) {
                             CRAS_STREAM_OUTPUT, 0, 0);
 
   iodev->update_active_node(iodev, 0, 1);
-
-  alsa_iodev_destroy(iodev);
-}
-
-TEST(AlsaIoInit, StartDevice) {
-  struct cras_iodev *iodev;
-  int rc;
-
-  ResetStubData();
-  iodev = alsa_iodev_create(0, test_card_name, 0, test_dev_name,
-                            NULL, ALSA_CARD_TYPE_INTERNAL, 0,
-                            NULL, NULL,
-                            CRAS_STREAM_OUTPUT, 0, 0);
-
-
-  // Return right away if it is already running.
-  snd_pcm_state_ret = SND_PCM_STATE_RUNNING;
-  rc = iodev->start(iodev);
-  EXPECT_EQ(0, rc);
-  EXPECT_EQ(0, cras_alsa_start_called);
-
-  // Otherwise, start the device.
-  snd_pcm_state_ret = SND_PCM_STATE_SETUP;
-  rc = iodev->start(iodev);
-  EXPECT_EQ(0, rc);
-  EXPECT_EQ(1, cras_alsa_start_called);
-
-  alsa_iodev_destroy(iodev);
-}
-
-TEST(AlsaIoInit, ResumeDevice) {
-  struct cras_iodev *iodev;
-  int rc;
-
-  ResetStubData();
-  iodev = alsa_iodev_create(0, test_card_name, 0, test_dev_name,
-                            NULL, ALSA_CARD_TYPE_INTERNAL, 0,
-                            NULL, NULL,
-                            CRAS_STREAM_OUTPUT, 0, 0);
-
-
-  // Attempt to resume if the device is suspended.
-  snd_pcm_state_ret = SND_PCM_STATE_SUSPENDED;
-  rc = iodev->start(iodev);
-  EXPECT_EQ(0, rc);
-  EXPECT_EQ(1, cras_alsa_attempt_resume_called);
 
   alsa_iodev_destroy(iodev);
 }
@@ -1389,7 +1339,6 @@ int cras_alsa_mmap_commit(snd_pcm_t *handle, snd_pcm_uframes_t offset,
 }
 int cras_alsa_attempt_resume(snd_pcm_t *handle)
 {
-  cras_alsa_attempt_resume_called++;
   return 0;
 }
 
@@ -1401,7 +1350,6 @@ int snd_pcm_format_physical_width(snd_pcm_format_t format)
 
 snd_pcm_state_t snd_pcm_state(snd_pcm_t *handle)
 {
-  return snd_pcm_state_ret;
   return SND_PCM_STATE_RUNNING;
 }
 
@@ -1791,11 +1739,6 @@ void cras_iodev_init_audio_area(struct cras_iodev *iodev,
 }
 
 void cras_iodev_free_audio_area(struct cras_iodev *iodev) {
-}
-
-int cras_iodev_reset_rate_estimator(const struct cras_iodev *iodev)
-{
-  return 0;
 }
 
 void cras_audio_area_config_buf_pointers(struct cras_audio_area *area,
