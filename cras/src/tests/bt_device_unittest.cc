@@ -80,7 +80,7 @@ int BtDeviceTestSuite::is_open_;
 TEST(BtDeviceSuite, CreateBtDevice) {
   struct cras_bt_device *device;
 
-  device = cras_bt_device_create(FAKE_OBJ_PATH);
+  device = cras_bt_device_create(NULL, FAKE_OBJ_PATH);
   EXPECT_NE((void *)NULL, device);
 
   device = cras_bt_device_get(FAKE_OBJ_PATH);
@@ -93,7 +93,7 @@ TEST(BtDeviceSuite, CreateBtDevice) {
 
 TEST_F(BtDeviceTestSuite, AppendRmIodev) {
   struct cras_bt_device *device;
-  device = cras_bt_device_create(FAKE_OBJ_PATH);
+  device = cras_bt_device_create(NULL, FAKE_OBJ_PATH);
   bt_iodev1.nodes = reinterpret_cast<struct cras_ionode*>(0x123);
   cras_bt_io_create_profile_ret = &bt_iodev1;
   cras_bt_device_append_iodev(device, &d1_,
@@ -133,7 +133,7 @@ TEST_F(BtDeviceTestSuite, SwitchProfile) {
   struct cras_bt_device *device;
 
   ResetStubData();
-  device = cras_bt_device_create(FAKE_OBJ_PATH);
+  device = cras_bt_device_create(NULL, FAKE_OBJ_PATH);
   cras_bt_io_create_profile_ret = &bt_iodev1;
   cras_bt_device_append_iodev(device, &d1_,
       CRAS_BT_DEVICE_PROFILE_A2DP_SOURCE);
