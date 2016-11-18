@@ -1242,7 +1242,10 @@ static unsigned int get_stream_limit_set_delay(struct open_dev *adev,
 		rstream = stream->stream;
 
 		shm = cras_rstream_input_shm(rstream);
-		cras_shm_check_write_overrun(shm);
+		if (cras_shm_check_write_overrun(shm))
+			ATLOG(atlog, AUDIO_THREAD_READ_OVERRUN,
+			      adev->dev->info.idx, rstream->stream_id,
+			      shm->area->num_overruns);
 		dev_stream_set_delay(stream, delay);
 		write_limit = MIN(write_limit,
 				  dev_stream_capture_avail(stream));
