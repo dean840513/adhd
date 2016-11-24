@@ -687,9 +687,6 @@ int cras_alsa_get_avail_frames(snd_pcm_t *handle, snd_pcm_uframes_t buf_size,
 		syslog(LOG_ERR, "pcm_avail error %s\n", snd_strerror(rc));
 		goto error;
 	} else if (frames > (snd_pcm_sframes_t)buf_size) {
-		syslog(LOG_ERR,
-		       "pcm_avail returned frames larger than buf_size: "
-		       "%ld > %lu\n", frames, buf_size);
 		frames = buf_size;
 		*underruns = *underruns + 1;
 	}
