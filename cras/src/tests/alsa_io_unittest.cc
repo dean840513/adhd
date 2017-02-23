@@ -2068,6 +2068,11 @@ int cras_iodev_list_set_hotword_model(cras_node_id_t node_id,
 	return 0;
 }
 
+struct audio_thread *cras_iodev_list_get_audio_thread()
+{
+  return NULL;
+}
+
 //  From alsa helper.
 int cras_alsa_set_channel_map(snd_pcm_t *handle,
 			      struct cras_audio_format *fmt)
@@ -2565,6 +2570,8 @@ struct audio_thread *audio_thread_create() {
 void audio_thread_destroy(audio_thread* thread) {
 }
 
+
+
 void cras_iodev_update_dsp(struct cras_iodev *iodev)
 {
   cras_iodev_update_dsp_called++;
@@ -2666,6 +2673,10 @@ void audio_thread_add_callback(int fd, thread_callback cb, void *data)
 
 void audio_thread_rm_callback(int fd)
 {
+}
+
+int audio_thread_rm_callback_sync(struct audio_thread *thread, int fd) {
+  return 0;
 }
 
 int is_utf8_string(const char* string)
