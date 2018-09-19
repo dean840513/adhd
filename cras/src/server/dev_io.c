@@ -644,16 +644,34 @@ int dev_io_send_captured_samples(struct open_dev *idev_list)
 	return 0;
 }
 
+static void handle_dev_err(
+		int err_rc,
+		struct open_dev **odevs,
+		struct open_dev *adev)
+{
+	if (err_rc == -EPIPE) {
+		/* Handle severe underrun. */
+		ATLOG(atlog, AUDIO_THREAD_SEVERE_UNDERRUN,
+		      adev->dev->info.idx, 0, 0);
+		cras_iodev_reset_request(adev->dev);
+	} else {
+		/* Device error, close it. */
+		dev_io_rm_open_dev(odevs, adev);
+	}
+}
+
 int dev_io_capture(struct open_dev **list)
 {
 	struct open_dev *idev_list = *list;
 	struct open_dev *adev;
+	int rc;
 
 	DL_FOREACH(idev_list, adev) {
 		if (!cras_iodev_is_open(adev->dev))
 			continue;
-		if (capture_to_streams(adev) < 0)
-			dev_io_rm_open_dev(list, adev);
+		rc = capture_to_streams(adev);
+		if (rc < 0)
+			handle_dev_err(rc, list, adev);
 	}
 
 	return 0;
