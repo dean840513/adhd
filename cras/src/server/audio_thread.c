@@ -307,7 +307,7 @@ static int append_stream(struct audio_thread *thread,
 		 * lower hardware level. Else if we fetch the new stream immediately, it
 		 * may cause device buffer level stack up.
 		 */
-		if (stream->direction == CRAS_STREAM_OUTPUT && dev->streams) {
+		if (stream->direction == CRAS_STREAM_OUTPUT) {
 			DL_FOREACH(dev->streams, out) {
 				stream_ts =  dev_stream_next_cb_ts(out);
 				if (stream_ts &&
@@ -316,6 +316,8 @@ static int append_stream(struct audio_thread *thread,
 					cb_ts_set = true;
 				}
 			}
+			if (!cb_ts_set)
+				clock_gettime(CLOCK_MONOTONIC_RAW, &init_cb_ts);
 		} else {
 			/*
 		 	 * If the new stream is a capture stream, we need to consider the
