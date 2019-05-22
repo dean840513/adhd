@@ -1197,6 +1197,15 @@ TEST(IoDev, SetNodeVolume) {
   EXPECT_EQ(0, cras_ramp_start_is_called);
 
   ResetStubData();
+  cras_system_get_mute_return = 1;
+  iodev.software_volume_needed = 1;
+  iodev.ramp = reinterpret_cast<struct cras_ramp*>(0x1);
+  cras_iodev_set_node_attr(&ionode, IONODE_ATTR_VOLUME, 15);
+  EXPECT_EQ(1, notify_node_volume_called);
+  // Even with software volume and non-NULL ramp, system mute will prevent ramp.
+  EXPECT_EQ(0, cras_ramp_start_is_called);
+
+  ResetStubData();
   iodev.software_volume_needed = 1;
   iodev.ramp = reinterpret_cast<struct cras_ramp*>(0x1);
   cras_iodev_set_node_attr(&ionode, IONODE_ATTR_VOLUME, 30);

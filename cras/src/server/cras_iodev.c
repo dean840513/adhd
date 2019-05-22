@@ -706,7 +706,8 @@ static void set_node_volume(struct cras_ionode *node, int value)
 		return;
 
 	volume = (unsigned int)MIN(value, 100);
-	if (dev->ramp && cras_iodev_software_volume_needed(dev))
+	if (dev->ramp && cras_iodev_software_volume_needed(dev) &&
+	    !cras_system_get_mute())
 		cras_iodev_start_volume_ramp(dev, node->volume, volume);
 	node->volume = volume;
 	if (dev->set_volume)
