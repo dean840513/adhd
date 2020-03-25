@@ -1151,6 +1151,8 @@ static void set_input_default_node_gain(struct alsa_input_node *input,
 	long default_node_gain;
 	int rc;
 
+	input->base.ui_gain_scaler = 1.0f;
+
 	if (!aio->ucm)
 		return;
 
