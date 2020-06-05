@@ -119,6 +119,7 @@ struct iodev_callback_list {
 	int fd;
 	int is_write;
 	int enabled;
+	enum AUDIO_THREAD_EVENTS_CB_TRIGGER trigger;
 	thread_callback cb;
 	void *cb_data;
 	struct pollfd *pollfd;
@@ -141,6 +142,7 @@ static void _audio_thread_add_callback(int fd, thread_callback cb, void *data,
 	iodev_cb->cb_data = data;
 	iodev_cb->enabled = 1;
 	iodev_cb->is_write = is_write;
+	iodev_cb->trigger = TRIGGER_POLL;
 
 	DL_APPEND(iodev_callbacks, iodev_cb);
 }
@@ -168,13 +170,14 @@ void audio_thread_rm_callback(int fd)
 	}
 }
 
-void audio_thread_enable_callback(int fd, int enabled)
+void audio_thread_config_events_callback(
+	int fd, enum AUDIO_THREAD_EVENTS_CB_TRIGGER trigger)
 {
 	struct iodev_callback_list *iodev_cb;
 
 	DL_FOREACH (iodev_callbacks, iodev_cb) {
 		if (iodev_cb->fd == fd) {
-			iodev_cb->enabled = !!enabled;
+			iodev_cb->trigger = trigger;
 			return;
 		}
 	}
@@ -845,7 +848,7 @@ static void *audio_io_thread(void *arg)
 		thread->num_pollfds = 1;
 
 		DL_FOREACH (iodev_callbacks, iodev_cb) {
-			if (!iodev_cb->enabled) {
+			if (iodev_cb->trigger != TRIGGER_POLL) {
 				iodev_cb->pollfd = NULL;
 				continue;
 			}
@@ -902,6 +905,9 @@ static void *audio_io_thread(void *arg)
 			    iodev_cb->pollfd->revents & (POLLIN | POLLOUT)) {
 				ATLOG(atlog, AUDIO_THREAD_IODEV_CB,
 				      iodev_cb->is_write, 0, 0);
+				iodev_cb->cb(iodev_cb->cb_data);
+			} else if (iodev_cb->trigger == TRIGGER_WAKEUP) {
+				ATLOG(atlog, AUDIO_THREAD_IODEV_CB, 0, 0, 0);
 				iodev_cb->cb(iodev_cb->cb_data);
 			}
 		}

@@ -302,8 +302,8 @@ static int configure_dev(struct cras_iodev *iodev)
 
 	audio_thread_add_write_callback(cras_bt_transport_fd(a2dpio->transport),
 					a2dp_socket_write_cb, iodev);
-	audio_thread_enable_callback(cras_bt_transport_fd(a2dpio->transport),
-				     0);
+	audio_thread_config_events_callback(
+		cras_bt_transport_fd(a2dpio->transport), TRIGGER_NONE);
 	return 0;
 }
 
@@ -415,8 +415,20 @@ do_flush:
 	/* If flush gets called before targeted next flush time, do nothing. */
 	clock_gettime(CLOCK_MONOTONIC_RAW, &now);
 	add_timespecs(&now, &flush_wake_fuzz_ts);
-	if (!timespec_after(&now, &a2dpio->next_flush_time))
+	if (!timespec_after(&now, &a2dpio->next_flush_time)) {
+		if (iodev->buffer_size == bt_local_queued_frames(iodev)) {
+			/*
+			 * If buffer is full, audio thread will no longer call
+			 * into get/put buffer in subsequent wake-ups. In that
+			 * case set the registered callback to be triggered at
+			 * next audio thread wake up.
+			 */
+			audio_thread_config_events_callback(
+				cras_bt_transport_fd(a2dpio->transport),
+				TRIGGER_WAKEUP);
+		}
 		return 0;
+	}
 
 	written = a2dp_write(&a2dpio->a2dp,
 			     cras_bt_transport_fd(a2dpio->transport),
@@ -427,8 +439,8 @@ do_flush:
 		/* If EAGAIN error lasts longer than 5 seconds, suspend the
 		 * a2dp connection. */
 		cras_bt_device_schedule_suspend(device, 5000);
-		audio_thread_enable_callback(
-			cras_bt_transport_fd(a2dpio->transport), 1);
+		audio_thread_config_events_callback(
+			cras_bt_transport_fd(a2dpio->transport), TRIGGER_POLL);
 		return 0;
 	} else if (written < 0) {
 		/* Suspend a2dp immediately when receives error other than
@@ -437,8 +449,8 @@ do_flush:
 		cras_bt_device_schedule_suspend(device, 0);
 		/* Stop polling the socket in audio thread. Main thread will
 		 * close this iodev soon. */
-		audio_thread_enable_callback(
-			cras_bt_transport_fd(a2dpio->transport), 0);
+		audio_thread_config_events_callback(
+			cras_bt_transport_fd(a2dpio->transport), TRIGGER_NONE);
 		return written;
 	}
 
@@ -448,8 +460,8 @@ do_flush:
 
 	/* a2dp_write no longer return -EAGAIN when reaches here, disable
 	 * the polling write callback. */
-	audio_thread_enable_callback(cras_bt_transport_fd(a2dpio->transport),
-				     0);
+	audio_thread_config_events_callback(
+		cras_bt_transport_fd(a2dpio->transport), TRIGGER_NONE);
 
 	/* Data succcessfully written to a2dp socket, cancel any scheduled
 	 * suspend timer. */
