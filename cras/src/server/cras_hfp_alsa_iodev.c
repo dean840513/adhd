@@ -242,6 +242,21 @@ static int hfp_alsa_is_free_running(const struct cras_iodev *iodev)
 	return aio->is_free_running(aio);
 }
 
+static int hfp_alsa_output_underrun(struct cras_iodev *iodev)
+{
+	struct hfp_alsa_io *hfp_alsa_io = (struct hfp_alsa_io *)iodev;
+	struct cras_iodev *aio = hfp_alsa_io->aio;
+
+	/*
+	 * Copy iodev->min_cb_level and iodev->max_cb_level from the parent
+	 * (i.e. hfp_alsa_iodev).  output_underrun() of alsa_io will use them.
+	 */
+	aio->min_cb_level = iodev->min_cb_level;
+	aio->max_cb_level = iodev->max_cb_level;
+
+	return aio->output_underrun(aio);
+}
+
 struct cras_iodev *hfp_alsa_iodev_create(struct cras_iodev *aio,
 					 struct cras_bt_device *device,
 					 struct hfp_slc_handle *slc,
@@ -291,6 +306,7 @@ struct cras_iodev *hfp_alsa_iodev_create(struct cras_iodev *aio,
 	iodev->get_valid_frames = hfp_alsa_get_valid_frames;
 	iodev->no_stream = hfp_alsa_no_stream;
 	iodev->is_free_running = hfp_alsa_is_free_running;
+	iodev->output_underrun = hfp_alsa_output_underrun;
 
 	iodev->min_buffer_level = aio->min_buffer_level;
 

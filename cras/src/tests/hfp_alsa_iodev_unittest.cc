@@ -57,6 +57,7 @@ _FAKE_CALL1(open_dev);
 _FAKE_CALL1(update_supported_formats);
 _FAKE_CALL1(configure_dev);
 _FAKE_CALL1(close_dev);
+_FAKE_CALL1(output_underrun);
 _FAKE_CALL2(frames_queued);
 _FAKE_CALL1(delay_frames);
 _FAKE_CALL3(get_buffer);
@@ -135,6 +136,10 @@ static void ResetStubData() {
   fake_sco_out.get_valid_frames =
       (int (*)(struct cras_iodev*, struct timespec*))fake_get_valid_frames;
   fake_get_valid_frames_called = 0;
+
+  fake_sco_out.output_underrun =
+      (int (*)(struct cras_iodev*))fake_output_underrun;
+  fake_output_underrun_called = 0;
 }
 
 namespace {
@@ -412,6 +417,25 @@ TEST_F(HfpAlsaIodev, GetValidFrames) {
 
   hfp_alsa_iodev_destroy(iodev);
 }
+
+TEST_F(HfpAlsaIodev, OutputUnderrun) {
+  struct cras_iodev* iodev;
+
+  fake_sco_out.direction = CRAS_STREAM_OUTPUT;
+  iodev = hfp_alsa_iodev_create(&fake_sco_out, fake_device, fake_slc,
+                                CRAS_BT_DEVICE_PROFILE_HFP_AUDIOGATEWAY);
+  iodev->min_cb_level = 0xab;
+  iodev->max_cb_level = 0xcd;
+
+  iodev->output_underrun(iodev);
+
+  EXPECT_EQ(0xab, fake_sco_out.min_cb_level);
+  EXPECT_EQ(0xcd, fake_sco_out.max_cb_level);
+  EXPECT_EQ(1, fake_output_underrun_called);
+
+  hfp_alsa_iodev_destroy(iodev);
+}
+
 }  // namespace
 
 extern "C" {
