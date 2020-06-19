@@ -29,7 +29,7 @@ void cras_board_config_get(const char *config_path,
 {
 	char ini_name[MAX_INI_NAME_LEN + 1];
 	char ini_key[MAX_KEY_LEN + 1];
-	char *ptr;
+	const char *ptr;
 	dictionary *ini;
 
 	board_config->default_output_buffer_size = DEFAULT_OUTPUT_BUFFER_SIZE;
