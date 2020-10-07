@@ -692,11 +692,6 @@ static int init_and_attach_streams(struct cras_iodev *dev)
 		if (!can_attach)
 			continue;
 
-		/*
-		 * Note that the stream list is descending ordered by channel
-		 * count, which guarantees the first attachable stream will have
-		 * the highest channel count.
-		 */
 		rc = init_device(dev, stream);
 		if (rc) {
 			syslog(LOG_ERR, "Enable %s failed, rc = %d",
@@ -821,7 +816,6 @@ static int stream_added_cb(struct cras_rstream *rstream)
 	struct cras_iodev *iodevs[10];
 	unsigned int num_iodevs;
 	int rc;
-	bool iodev_reopened;
 
 	if (stream_list_suspended)
 		return 0;
@@ -835,46 +829,24 @@ static int stream_added_cb(struct cras_rstream *rstream)
 	/* Add the new stream to all enabled iodevs at once to avoid offset
 	 * in shm level between different ouput iodevs. */
 	num_iodevs = 0;
-	iodev_reopened = false;
 	DL_FOREACH (enabled_devs[rstream->direction], edev) {
 		if (num_iodevs >= ARRAY_SIZE(iodevs)) {
 			syslog(LOG_ERR, "too many enabled devices");
 			break;
 		}
 
-		if (cras_iodev_is_open(edev->dev) &&
-		    (rstream->format.num_channels >
-		     edev->dev->format->num_channels)) {
-			/* Re-open the device with the format of the attached
-			 * stream if it has higher channel count than the
-			 * current format of the device. Fallback device will
-			 * be transciently enabled during the device re-opening.
+		rc = init_device(edev->dev, rstream);
+		if (rc) {
+			/* Error log but don't return error here, because
+			 * stopping audio could block video playback.
 			 */
-			MAINLOG(main_log, MAIN_THREAD_DEV_REOPEN,
-				rstream->format.num_channels,
-				edev->dev->format->num_channels,
-				edev->dev->format->frame_rate);
-			syslog(LOG_INFO, "re-open %s for higher channel count",
-			       edev->dev->info.name);
-			possibly_enable_fallback(rstream->direction, false);
-			cras_iodev_list_suspend_dev(edev->dev->info.idx);
-			cras_iodev_list_resume_dev(edev->dev->info.idx);
-			possibly_disable_fallback(rstream->direction);
-			iodev_reopened = true;
-		} else {
-			rc = init_device(edev->dev, rstream);
-			if (rc) {
-				/* Error log but don't return error here, because
-				 * stopping audio could block video playback.
-				 */
-				syslog(LOG_ERR, "Init %s failed, rc = %d",
-				       edev->dev->info.name, rc);
-				schedule_init_device_retry(edev->dev);
-				continue;
-			}
-
-			iodevs[num_iodevs++] = edev->dev;
+			syslog(LOG_ERR, "Init %s failed, rc = %d",
+			       edev->dev->info.name, rc);
+			schedule_init_device_retry(edev->dev);
+			continue;
 		}
+
+		iodevs[num_iodevs++] = edev->dev;
 	}
 	if (num_iodevs) {
 		rc = add_stream_to_open_devs(rstream, iodevs, num_iodevs);
@@ -882,9 +854,9 @@ static int stream_added_cb(struct cras_rstream *rstream)
 			syslog(LOG_ERR, "adding stream to thread fail");
 			return rc;
 		}
-	} else if (!iodev_reopened) {
+	} else {
 		/* Enable fallback device if no other iodevs can be initialized
-		 * or re-opened successfully.
+		 * successfully.
 		 * For error codes like EAGAIN and ENOENT, a new iodev will be
 		 * enabled soon so streams are going to route there. As for the
 		 * rest of the error cases, silence will be played or recorded
