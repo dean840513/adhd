@@ -342,6 +342,7 @@ static int close_dev(struct cras_iodev *iodev)
 {
 	struct alsa_io *aio = (struct alsa_io *)iodev;
 
+	syslog(LOG_ERR, "cras_alsa_io - close_dev %s", iodev->info.name);
 	/* Removes audio thread callback from main thread. */
 	if (aio->poll_fd >= 0)
 		audio_thread_rm_callback_sync(
@@ -379,6 +380,7 @@ static int open_dev(struct cras_iodev *iodev)
 	int rc;
 	const char *pcm_name = NULL;
 
+	syslog(LOG_ERR, "cras_alsa_io - open_dev %s", iodev->info.name);
 	if (aio->base.direction == CRAS_STREAM_OUTPUT) {
 		struct alsa_output_node *aout =
 			(struct alsa_output_node *)aio->base.active_node;
@@ -504,6 +506,7 @@ static int start(const struct cras_iodev *iodev)
 	snd_pcm_t *handle = aio->handle;
 	int rc;
 
+	syslog(LOG_ERR, "cras_alsa_io - start %s", iodev->info.name);
 	if (snd_pcm_state(handle) == SND_PCM_STATE_RUNNING)
 		return 0;
 

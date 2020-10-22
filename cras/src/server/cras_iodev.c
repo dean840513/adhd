@@ -107,6 +107,7 @@ static int default_no_stream_playback(struct cras_iodev *odev)
 static int cras_iodev_start(struct cras_iodev *iodev)
 {
 	int rc;
+	syslog(LOG_ERR, "cras_iodev_start %s", iodev->info.name);
 	if (!cras_iodev_is_open(iodev))
 		return -EPERM;
 	if (!iodev->start) {
@@ -903,6 +904,7 @@ int cras_iodev_open(struct cras_iodev *iodev, unsigned int cb_level,
 	struct cras_loopback *loopback;
 	int rc;
 
+	syslog(LOG_ERR, "cras_iodev_open %s", iodev->info.name);
 	if (iodev->pre_open_iodev_hook)
 		iodev->pre_open_iodev_hook();
 
@@ -997,6 +999,7 @@ int cras_iodev_close(struct cras_iodev *iodev)
 	struct cras_loopback *loopback;
 	int rc;
 
+	syslog(LOG_ERR, "cras_iodev_close %s", iodev->info.name);
 	if (!cras_iodev_is_open(iodev))
 		return 0;
 
