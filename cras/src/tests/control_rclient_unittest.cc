@@ -967,4 +967,6 @@ struct packet_status_logger* cras_hfp_ag_get_wbs_logger() {
   return NULL;
 }
 
+void cras_system_set_hotword_pause_at_suspend(bool pause) {}
+
 }  // extern "C"
