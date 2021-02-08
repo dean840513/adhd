@@ -1,12 +1,10 @@
 // Copyright 2020 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use std::any::Any;
 use std::error;
 use std::fmt;
 use std::io;
 use std::num::ParseIntError;
-use std::path::PathBuf;
 use std::sync::PoisonError;
 use std::time;
 
@@ -19,13 +17,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     AlsaCardError(cros_alsa::CardError),
     AlsaControlError(cros_alsa::ControlError),
+    CalibrationFailed,
     CalibrationTimeout,
     CrasClientFailed(libcras::Error),
     DeserializationFailed(String, serde_yaml::Error),
-    FileIOFailed(PathBuf, io::Error),
+    FileIOFailed(String, io::Error),
+    HotSpeaker,
     InternalSpeakerNotFound,
     InvalidDatastore,
-    InvalidDSMParam,
     InvalidShutDownTime,
     InvalidTemperature(i32),
     LargeCalibrationDiff(i32, i32),
@@ -34,14 +33,12 @@ pub enum Error {
     NewPlayStreamFailed(libcras::BoxError),
     NextPlaybackBufferFailed(libcras::BoxError),
     PlaybackFailed(io::Error),
-    SerdeError(PathBuf, serde_yaml::Error),
+    ReadTimestampFailed(utils::error::Error),
+    SerializationFailed(serde_yaml::Error),
     StartPlaybackTimeout,
     SystemTimeError(time::SystemTimeError),
-    UnsupportedSoundCard(String),
     VPDParseFailed(String, ParseIntError),
-    WorkerPanics(Box<dyn Any + Send + 'static>),
-    ZeroPlayerIsNotRunning,
-    ZeroPlayerIsRunning,
+    WorkerPanics,
 }
 
 impl From<cros_alsa::CardError> for Error {
@@ -70,12 +67,11 @@ impl fmt::Display for Error {
         match self {
             AlsaCardError(e) => write!(f, "{}", e),
             AlsaControlError(e) => write!(f, "{}", e),
+            CalibrationFailed => write!(f, "amp calibration failed"),
             CalibrationTimeout => write!(f, "calibration is not finished in time"),
             CrasClientFailed(e) => write!(f, "failed to create cras client: {}", e),
-            DeserializationFailed(file_path, e) => {
-                write!(f, "failed to parse {}: {}", file_path, e)
-            }
-            FileIOFailed(file_path, e) => write!(f, "{:#?}: {}", file_path, e),
+            DeserializationFailed(file, e) => write!(f, "failed to parse {}: {}", file, e),
+            FileIOFailed(file, e) => write!(f, "{}: {}", file, e),
             InvalidShutDownTime => write!(f, "invalid shutdown time"),
             InternalSpeakerNotFound => write!(f, "internal speaker is not found in cras"),
             InvalidTemperature(temp) => write!(
@@ -84,7 +80,7 @@ impl fmt::Display for Error {
                 temp
             ),
             InvalidDatastore => write!(f, "invalid datastore format"),
-            InvalidDSMParam => write!(f, "invalid dsm param from kcontrol"),
+            HotSpeaker => write!(f, "skip boot time calibration as the speakers may be hot"),
             LargeCalibrationDiff(rdc, temp) => write!(
                 f,
                 "calibration difference is too large, rdc: {}, temp: {}",
@@ -95,14 +91,12 @@ impl fmt::Display for Error {
             NewPlayStreamFailed(e) => write!(f, "{}", e),
             NextPlaybackBufferFailed(e) => write!(f, "{}", e),
             PlaybackFailed(e) => write!(f, "{}", e),
-            SerdeError(file_path, e) => write!(f, "{:?}: {}", file_path, e),
+            ReadTimestampFailed(e) => write!(f, "{}", e),
+            SerializationFailed(e) => write!(f, "failed to serialize yaml: {}", e),
             StartPlaybackTimeout => write!(f, "playback is not started in time"),
             SystemTimeError(e) => write!(f, "{}", e),
-            UnsupportedSoundCard(name) => write!(f, "unsupported sound card: {}", name),
-            VPDParseFailed(file_path, e) => write!(f, "failed to parse vpd {}: {}", file_path, e),
-            WorkerPanics(e) => write!(f, "run_play_zero_worker panics: {:#?}", e),
-            ZeroPlayerIsNotRunning => write!(f, "zero player is not running"),
-            ZeroPlayerIsRunning => write!(f, "zero player is running"),
+            VPDParseFailed(file, e) => write!(f, "failed to parse vpd {}: {}", file, e),
+            WorkerPanics => write!(f, "run_play_zero_worker panics"),
         }
     }
 }
