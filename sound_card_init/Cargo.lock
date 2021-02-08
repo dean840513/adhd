@@ -16,7 +16,6 @@ version = "0.1.0"
 dependencies = [
  "cros_alsa",
  "dsm",
- "libcras",
  "remain",
  "serde",
  "serde_yaml",
