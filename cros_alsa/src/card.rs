@@ -58,7 +58,6 @@ impl fmt::Display for Error {
 }
 
 /// `Card` represents a sound card.
-#[derive(Debug)]
 pub struct Card {
     handle: Ctl,
     name: String,
