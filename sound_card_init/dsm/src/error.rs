@@ -12,8 +12,6 @@ use std::time;
 
 use remain::sorted;
 
-use crate::CalibData;
-
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[sorted]
@@ -29,8 +27,8 @@ pub enum Error {
     InvalidDatastore,
     InvalidDSMParam,
     InvalidShutDownTime,
-    InvalidTemperature(f32),
-    LargeCalibrationDiff(CalibData),
+    InvalidTemperature(i32),
+    LargeCalibrationDiff(i32, i32),
     MissingDSMParam,
     MutexPoisonError,
     NewPlayStreamFailed(libcras::BoxError),
@@ -87,9 +85,11 @@ impl fmt::Display for Error {
             ),
             InvalidDatastore => write!(f, "invalid datastore format"),
             InvalidDSMParam => write!(f, "invalid dsm param from kcontrol"),
-            LargeCalibrationDiff(calib) => {
-                write!(f, "calibration difference is too large, calib: {:?}", calib)
-            }
+            LargeCalibrationDiff(rdc, temp) => write!(
+                f,
+                "calibration difference is too large, rdc: {}, temp: {}",
+                rdc, temp
+            ),
             MissingDSMParam => write!(f, "missing dsm_param.bin"),
             MutexPoisonError => write!(f, "mutex is poisoned"),
             NewPlayStreamFailed(e) => write!(f, "{}", e),
