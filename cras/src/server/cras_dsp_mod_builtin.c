@@ -198,6 +198,7 @@ static void quad_rotation_init_module(struct dsp_module *module)
 	module->deinstantiate = &quad_rotation_deinstantiate;
 	module->free_module = &empty_free_module;
 	module->get_properties = &empty_get_properties;
+	module->dump = &empty_dump;
 }
 
 /*
@@ -248,6 +249,7 @@ static void swap_lr_init_module(struct dsp_module *module)
 	module->deinstantiate = &swap_lr_deinstantiate;
 	module->free_module = &empty_free_module;
 	module->get_properties = &empty_get_properties;
+	module->dump = &empty_dump;
 }
 
 /*
@@ -294,6 +296,7 @@ static void invert_lr_init_module(struct dsp_module *module)
 	module->deinstantiate = &invert_lr_deinstantiate;
 	module->free_module = &empty_free_module;
 	module->get_properties = &empty_get_properties;
+	module->dump = &empty_dump;
 }
 
 /*
